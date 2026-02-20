@@ -280,7 +280,7 @@ interface ContentProps {
   loading: boolean;
   error: string;
   progress: number;
-  mobileRef: React.RefObject<HTMLInputElement>;
+  mobileRef: any;
   setMobile: (v: string) => void;
   setOtp: (v: string) => void;
   setError: (v: string) => void;
