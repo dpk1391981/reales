@@ -610,7 +610,7 @@ const RealEstateHeader: React.FC = () => {
               <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-[#0f2342] via-[#0f2342] to-[#c9a84c] rounded-[9px] flex items-center justify-center shadow-sm">
                 <HomeIcon />
               </div>
-              <div className="xs:hidden lg:block">
+              <div className="hidden xs:block">
                 <div className="font-[Playfair_Display,serif] text-base md:text-xl font-bold text-[#0f2342] leading-none">
                   Think4BuySale
                 </div>
@@ -619,9 +619,9 @@ const RealEstateHeader: React.FC = () => {
                 </div>
               </div>
               {/* Compact logo text on tiny screens */}
-              <div className="lg:hidden">
+              {/* <div className="xs:hidden">
                 <div className="font-[Playfair_Display,serif] text-sm font-bold text-[#0f2342] leading-none">T4BS</div>
-              </div>
+              </div> */}
             </a>
 
             {/* MOBILE SEARCH BAR — prominent, takes most of the header space */}
