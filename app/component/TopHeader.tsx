@@ -354,7 +354,7 @@ const RealEstateHeader: React.FC = () => {
           <div className="max-w-[1280px] mx-auto px-3 md:px-6 flex items-center h-14 md:h-[70px] gap-2 md:gap-6">
 
             {/* LOGO */}
-            <a href="#" className="flex items-center gap-2 no-underline shrink-0">
+            <a href="/" className="flex items-center gap-2 no-underline shrink-0">
               <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-[#0f2342] via-[#0f2342] to-[#c9a84c] rounded-[9px] flex items-center justify-center shadow-sm">
                 <HomeIcon />
               </div>
