@@ -353,13 +353,13 @@ const RealEstateHeader: React.FC = () => {
         <div className="hidden md:block bg-[#0f2342] text-white/65 text-xs font-normal tracking-wide py-[7px]">
           <div className="max-w-[1280px] mx-auto px-6 flex justify-between items-center flex-wrap gap-3">
             <div className="flex gap-5 items-center">
-              <span>📞 1800-000-9999</span>
+              <span>📞 8285-25-76-36</span>
               <span className="opacity-30">|</span>
               <a
-                href="mailto:support@nestfind.in"
+                href="mailto:support@think4buysale.in"
                 className="text-white/65 no-underline hover:text-white transition-colors"
               >
-                support@nestfind.in
+                support@think4buysale.in
               </a>
             </div>
             <div className="flex gap-5 items-center">

@@ -45,7 +45,7 @@ export default function TopServices() {
             </span>
           </h2>
           <p className="text-slate-500 mt-4 text-sm max-w-[600px] mx-auto">
-            Whether you're buying, selling or renting — NestFind provides
+            Whether you're buying, selling or renting — Think4BuySale provides
             complete real estate solutions.
           </p>
           <div className="w-16 h-1 bg-amber-500 mx-auto mt-6 rounded-full" />
