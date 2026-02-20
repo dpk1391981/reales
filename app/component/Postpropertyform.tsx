@@ -840,12 +840,14 @@ export default function PostPropertyForm() {
   const [submitting, setSubmitting] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle"|"saving"|"saved"|"error">("idle");
   const [data, setRaw]            = useState<FormData>(INITIAL);
-  const autoSaveTimer             = useRef<ReturnType<typeof setTimeout>>();
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const set = useCallback((k:string,v:any) => {
     setRaw(p=>({...p,[k]:v}));
     // Trigger auto-save after 2s of inactivity
-    clearTimeout(autoSaveTimer.current);
+    if (autoSaveTimer.current) {
+      clearTimeout(autoSaveTimer.current);
+    }
     setSaveStatus("idle");
     autoSaveTimer.current = setTimeout(()=>{
       setSaveStatus("saving");
