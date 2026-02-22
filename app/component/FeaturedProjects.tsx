@@ -130,7 +130,7 @@ const ProjectCard = ({ project }: { project: typeof projects[0] }) => {
           <span className={`text-[10px] font-bold px-3 py-1.5 rounded-full shadow-sm tracking-wide
             ${isReady
               ? "bg-emerald-500 text-white"
-              : "bg-amber-400 text-[#0f2342]"
+              : "bg-amber-400 text-brand-900"
             }`}>
             {project.status}
           </span>
@@ -153,7 +153,7 @@ const ProjectCard = ({ project }: { project: typeof projects[0] }) => {
         {/* Tag pill at bottom */}
         <div className="absolute bottom-3 left-3">
           <span className="text-[9px] font-bold tracking-[0.12em] uppercase
-            bg-white/90 backdrop-blur-sm text-[#0f2342] px-2.5 py-1 rounded-full border border-white/50">
+            bg-white/90 backdrop-blur-sm text-brand-900 px-2.5 py-1 rounded-full border border-white/50">
             {project.tag}
           </span>
         </div>
@@ -163,7 +163,7 @@ const ProjectCard = ({ project }: { project: typeof projects[0] }) => {
       <div className="p-4 md:p-5">
 
         {/* Name */}
-        <h3 className="text-base md:text-lg font-bold text-[#0f2342] leading-snug mb-1.5
+        <h3 className="text-base md:text-lg font-bold text-brand-900 leading-snug mb-1.5
           group-hover:text-amber-600 transition-colors">
           {project.name}
         </h3>
@@ -179,7 +179,7 @@ const ProjectCard = ({ project }: { project: typeof projects[0] }) => {
           border-y border-dashed border-slate-100">
           <div>
             <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wide mb-0.5">Price</p>
-            <p className="text-base font-bold text-[#0f2342]">{project.price}</p>
+            <p className="text-base font-bold text-brand-900">{project.price}</p>
           </div>
           <div className="text-right">
             <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wide mb-0.5">Config</p>
@@ -192,7 +192,7 @@ const ProjectCard = ({ project }: { project: typeof projects[0] }) => {
 
         {/* CTA row */}
         <div className="flex gap-2">
-          <button className="flex-1 bg-gradient-to-r from-[#0f2342] to-[#1a3a6e] text-white
+          <button className="flex-1 bg-gradient-to-r btn-primary text-white
             text-sm font-bold py-3 rounded-2xl transition-all
             hover:shadow-[0_6px_20px_rgba(15,35,66,0.3)] hover:-translate-y-px
             active:scale-[0.97] flex items-center justify-center gap-1.5">
@@ -241,9 +241,11 @@ export default function FeaturedProjects() {
               <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-amber-500 mb-2">
                 ✦ Handpicked for You
               </p>
-              <h2 className="font-[Playfair_Display,serif] text-2xl md:text-4xl font-bold text-[#0f2342] leading-tight">
-                Featured{" "}
-                <span className="text-amber-500">Projects</span>
+              <h2 className="font-[Playfair_Display,serif] text-2xl md:text-4xl font-bold leading-tight">
+                <span className="bg-gradient-to-r from-brand-500 to-brand-600 bg-clip-text text-transparent">
+                  Featured
+                </span>{" "}
+                <span className="text-brand-900">Projects</span>
               </h2>
               <p className="text-slate-500 mt-2 text-sm leading-relaxed max-w-[420px]">
                 Premium residential projects across top Indian cities — verified & RERA approved.
@@ -258,7 +260,7 @@ export default function FeaturedProjects() {
 
             {/* View All — desktop */}
             <a href="#"
-              className="hidden sm:flex items-center gap-2 text-sm font-semibold text-[#0f2342]
+              className="hidden sm:flex items-center gap-2 text-sm font-semibold text-brand-900
                 border-2 border-slate-200 rounded-xl px-5 py-2.5 no-underline shrink-0
                 hover:border-[#0f2342] hover:bg-slate-50 transition-all">
               View All Projects
@@ -276,7 +278,7 @@ export default function FeaturedProjects() {
                 className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold
                   border transition-all cursor-pointer font-[inherit] active:scale-95
                   ${activeFilter === f
-                    ? "bg-[#0f2342] text-white border-[#0f2342] shadow-[0_4px_12px_rgba(15,35,66,0.25)]"
+                    ? "bg-brand-900 text-white border-brand-900 shadow-[0_4px_12px_rgba(15,35,66,0.25)]"
                     : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
                   }`}
                 style={{ WebkitTapHighlightColor: "transparent" }}
@@ -312,15 +314,15 @@ export default function FeaturedProjects() {
           {/* ── Mobile scroll hint ── */}
           <div className="sm:hidden flex items-center justify-center gap-1.5 mt-4">
             {filtered.map((_, i) => (
-              <div key={i} className={`rounded-full transition-all ${i === 0 ? "w-5 h-1.5 bg-[#0f2342]" : "w-1.5 h-1.5 bg-slate-300"}`} />
+              <div key={i} className={`rounded-full transition-all ${i === 0 ? "w-5 h-1.5 bg-brand-900" : "w-1.5 h-1.5 bg-slate-300"}`} />
             ))}
           </div>
 
           {/* ── View All — mobile ── */}
           <div className="sm:hidden mt-6">
             <a href="#"
-              className="flex items-center justify-center gap-2 w-full py-3.5 text-sm font-bold
-                text-[#0f2342] border-2 border-slate-200 rounded-2xl no-underline
+              className="btn-primaryflex items-center justify-center gap-2 w-full py-3.5 text-sm font-bold
+                text-brand-900 border-2 border-slate-200 rounded-2xl no-underline
                 active:bg-slate-50 transition-all">
               View All Projects
               <ChevronRightIcon />
@@ -330,7 +332,7 @@ export default function FeaturedProjects() {
           {/* ── Stats row ── */}
           <div
             className="fade-up mt-10 md:mt-14 grid grid-cols-3 gap-3 md:gap-6
-              bg-gradient-to-r from-[#0f2342] to-[#1a3a6e] rounded-3xl p-5 md:p-8"
+              bg-gradient-to-r btn-primary rounded-3xl p-5 md:p-8"
             style={{ animationDelay: "0.2s" }}
           >
             {[
