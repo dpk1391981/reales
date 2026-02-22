@@ -10,7 +10,7 @@ interface SidebarProps {
   onSave: () => void;
 }
 
-export const Sidebar = ({ d, saveStatus, onSave }: SidebarProps) => {
+export const Sidebar = ({ d, saveStatus, onSave }: any) => {
   const filled = [
     d.propertyCategory,
     d.listingType,
