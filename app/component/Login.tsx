@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { sendOtpApi, verifyOtpApi } from "@/services/authApi";
+import { useAppDispatch } from "@/store/hooks";
+import { setUser } from "@/store/slices/authSlice";
 
 interface Props {
   open: boolean;
@@ -10,19 +13,40 @@ interface Props {
 // ── Icons ──────────────────────────────────────────────────────────────────────
 
 const CloseIcon = () => (
-  <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+  <svg
+    width="18"
+    height="18"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    viewBox="0 0 24 24"
+  >
     <path d="M18 6L6 18M6 6l12 12" />
   </svg>
 );
 
 const ArrowLeftIcon = () => (
-  <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+  <svg
+    width="18"
+    height="18"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    viewBox="0 0 24 24"
+  >
     <path d="M19 12H5M12 5l-7 7 7 7" />
   </svg>
 );
 
 const ShieldIcon = () => (
-  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+  <svg
+    width="13"
+    height="13"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    viewBox="0 0 24 24"
+  >
     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
   </svg>
 );
@@ -55,7 +79,10 @@ const OtpInput = ({
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    const pasted = e.clipboardData
+      .getData("text")
+      .replace(/\D/g, "")
+      .slice(0, 6);
     if (pasted) {
       onChange(pasted);
       inputs.current[Math.min(pasted.length, 5)]?.focus();
@@ -68,7 +95,9 @@ const OtpInput = ({
       {[0, 1, 2, 3, 4, 5].map((i) => (
         <input
           key={i}
-          ref={(el) => { inputs.current[i] = el; }}
+          ref={(el) => {
+            inputs.current[i] = el;
+          }}
           type="tel"
           inputMode="numeric"
           maxLength={1}
@@ -78,9 +107,10 @@ const OtpInput = ({
           onPaste={handlePaste}
           className={`w-11 h-12 text-center text-lg font-bold rounded-xl border-2 outline-none
             transition-all duration-150 font-[DM_Sans,sans-serif] bg-white
-            ${value[i]
-              ? "border-[#0f2342] text-[#0f2342] bg-amber-50"
-              : "border-slate-200 text-slate-400"
+            ${
+              value[i]
+                ? "border-[#0f2342] text-[#0f2342] bg-amber-50"
+                : "border-slate-200 text-slate-400"
             }
             focus:border-amber-400 focus:bg-amber-50`}
           style={{ fontSize: "18px", WebkitTapHighlightColor: "transparent" }}
@@ -93,6 +123,8 @@ const OtpInput = ({
 // ── Main Modal ────────────────────────────────────────────────────────────────
 
 export default function LoginModal({ open, onClose }: Props) {
+  const dispatch = useAppDispatch();
+
   const [mobile, setMobile] = useState("");
   const [otp, setOtp] = useState("");
   const [step, setStep] = useState<"mobile" | "otp">("mobile");
@@ -117,7 +149,9 @@ export default function LoginModal({ open, onClose }: Props) {
         setTimer(0);
       }, 300);
     }
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [open]);
 
   // Countdown timer
@@ -134,28 +168,61 @@ export default function LoginModal({ open, onClose }: Props) {
 
   if (!open) return null;
 
-  const sendOtp = async () => {
-    if (mobile.length < 10) {
-      setError("Please enter a valid 10-digit mobile number");
-      return;
-    }
-    setError("");
+ const sendOtp = async () => {
+  if (mobile.length !== 10) {
+    setError("Please enter a valid 10-digit mobile number");
+    return;
+  }
+
+  try {
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 800)); // Simulate API
-    setLoading(false);
+    setError("");
+
+    const { data } = await sendOtpApi({
+      phone: mobile,
+    });
     setStep("otp");
     setTimer(30);
-    setOtp("");
-  };
+    setLoading(true);
+    setTimeout(() => {
+      setOtp(data.otp || "");
+      setLoading(false);
+    }, 3000);
+  } catch (err: any) {
+    setError(err?.response?.data?.message || "Failed to send OTP");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const verifyOtp = async () => {
-    if (otp.length < 6) return;
-    setError("");
+  if (otp.length !== 6) return;
+
+  try {
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
+    setError("");
+
+    const { data } = await verifyOtpApi({
+      phone: mobile,
+      otp,
+    });
+
+    if (data.success) {
+      // Save tokens
+      localStorage.setItem("access_token", data.data.access_token);
+      localStorage.setItem("refresh_token", data.data.refresh_token);
+
+      // Update Redux
+      dispatch(setUser(data.data.user));
+
+      onClose();
+    }
+  } catch (err: any) {
+    setError(err?.response?.data?.message || "Invalid OTP");
+  } finally {
     setLoading(false);
-    onClose();
-  };
+  }
+};
 
   const progress = step === "mobile" ? 1 : 2;
 
@@ -186,7 +253,6 @@ export default function LoginModal({ open, onClose }: Props) {
       `}</style>
 
       <div className="fixed inset-0 z-[999] font-[DM_Sans,sans-serif]">
-
         {/* Backdrop */}
         <div
           onClick={onClose}
@@ -194,10 +260,11 @@ export default function LoginModal({ open, onClose }: Props) {
         />
 
         {/* ── MOBILE: bottom sheet ── */}
-        <div className="sheet-anim sm:hidden absolute bottom-0 left-0 right-0
+        <div
+          className="sheet-anim sm:hidden absolute bottom-0 left-0 right-0
           bg-white rounded-t-3xl shadow-[0_-8px_40px_rgba(0,0,0,0.2)] overflow-hidden
-          max-h-[92vh] flex flex-col">
-
+          max-h-[92vh] flex flex-col"
+        >
           {/* Drag handle */}
           <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
             <div className="w-10 h-1 bg-slate-200 rounded-full" />
@@ -226,9 +293,10 @@ export default function LoginModal({ open, onClose }: Props) {
 
         {/* ── DESKTOP: centered card ── */}
         <div className="card-anim hidden sm:flex absolute inset-0 items-center justify-center p-4">
-          <div className="relative bg-white w-full max-w-md rounded-3xl
-            shadow-[0_24px_64px_rgba(0,0,0,0.25)] overflow-hidden">
-
+          <div
+            className="relative bg-white w-full max-w-md rounded-3xl
+            shadow-[0_24px_64px_rgba(0,0,0,0.25)] overflow-hidden"
+          >
             {/* Top gradient bar */}
             <div className="h-1.5 w-full bg-gradient-to-r from-[#0f2342] via-[#1a3a6e] to-amber-400" />
 
@@ -264,7 +332,6 @@ export default function LoginModal({ open, onClose }: Props) {
             </div>
           </div>
         </div>
-
       </div>
     </>
   );
@@ -291,26 +358,46 @@ interface ContentProps {
 }
 
 function ModalContent({
-  step, mobile, otp, timer, loading, error, progress,
-  mobileRef, setMobile, setOtp, setError, setStep, sendOtp, verifyOtp, onClose,
+  step,
+  mobile,
+  otp,
+  timer,
+  loading,
+  error,
+  progress,
+  mobileRef,
+  setMobile,
+  setOtp,
+  setError,
+  setStep,
+  sendOtp,
+  verifyOtp,
+  onClose,
 }: ContentProps) {
   return (
     <>
       {/* Progress dots */}
       <div className="flex items-center gap-1.5 mb-5">
         {[1, 2].map((s) => (
-          <div key={s} className={`h-1.5 rounded-full transition-all duration-300
+          <div
+            key={s}
+            className={`h-1.5 rounded-full transition-all duration-300
             ${s === progress ? "w-8 bg-[#0f2342]" : s < progress ? "w-4 bg-amber-400" : "w-4 bg-slate-200"}`}
           />
         ))}
-        <span className="ml-1 text-[10px] text-slate-400 font-medium">Step {progress} of 2</span>
+        <span className="ml-1 text-[10px] text-slate-400 font-medium">
+          Step {progress} of 2
+        </span>
       </div>
 
       {/* Header */}
       <div className="mb-5">
         {step === "otp" && (
           <button
-            onClick={() => { setStep("mobile"); setOtp(""); }}
+            onClick={() => {
+              setStep("mobile");
+              setOtp("");
+            }}
             className="flex items-center gap-1.5 text-xs font-medium text-slate-500
               mb-3 border-none bg-transparent cursor-pointer p-0 font-[inherit]
               hover:text-[#0f2342] transition-colors"
@@ -322,9 +409,13 @@ function ModalContent({
         )}
         <h2 className="font-[Playfair_Display,serif] text-xl font-bold text-[#0f2342] leading-tight">
           {step === "mobile" ? (
-            <>Sign In to <span className="text-amber-500">Think4BuySale</span></>
+            <>
+              Sign In to <span className="text-amber-500">Think4BuySale</span>
+            </>
           ) : (
-            <>Verify your <span className="text-amber-500">Number</ span></>
+            <>
+              Verify your <span className="text-amber-500">Number</span>
+            </>
           )}
         </h2>
         <p className="text-sm text-slate-500 mt-1">
@@ -364,8 +455,10 @@ function ModalContent({
           <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">
             Mobile Number
           </label>
-          <div className={`flex items-center border-2 rounded-2xl overflow-hidden transition-all
-            ${error ? "border-red-400" : "border-slate-200 focus-within:border-amber-400"}`}>
+          <div
+            className={`flex items-center border-2 rounded-2xl overflow-hidden transition-all
+            ${error ? "border-red-400" : "border-slate-200 focus-within:border-amber-400"}`}
+          >
             <div className="flex items-center gap-1.5 px-3 py-3.5 bg-slate-50 border-r border-slate-200 flex-shrink-0">
               <span className="text-base">🇮🇳</span>
               <span className="text-sm font-semibold text-slate-600">+91</span>
@@ -387,7 +480,9 @@ function ModalContent({
               style={{ fontSize: "16px" /* prevents iOS zoom */ }}
             />
           </div>
-          {error && <p className="text-xs text-red-500 mt-1.5 font-medium">{error}</p>}
+          {error && (
+            <p className="text-xs text-red-500 mt-1.5 font-medium">{error}</p>
+          )}
 
           <button
             onClick={sendOtp}
@@ -401,13 +496,20 @@ function ModalContent({
           >
             {loading ? (
               <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : "Send OTP"}
+            ) : (
+              "Send OTP"
+            )}
           </button>
 
           <p className="text-center text-xs text-slate-400 mt-4">
             By continuing you agree to our{" "}
-            <a href="#" className="text-amber-500 no-underline font-medium">Terms</a> &{" "}
-            <a href="#" className="text-amber-500 no-underline font-medium">Privacy Policy</a>
+            <a href="#" className="text-amber-500 no-underline font-medium">
+              Terms
+            </a>{" "}
+            &{" "}
+            <a href="#" className="text-amber-500 no-underline font-medium">
+              Privacy Policy
+            </a>
           </p>
         </div>
       )}
@@ -416,9 +518,13 @@ function ModalContent({
       {step === "otp" && (
         <div className="step-anim">
           {/* OTP hint */}
-          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200
-            rounded-2xl px-4 py-3 mb-5">
-            <span className="text-amber-500 flex-shrink-0"><ShieldIcon /></span>
+          <div
+            className="flex items-center gap-2 bg-amber-50 border border-amber-200
+            rounded-2xl px-4 py-3 mb-5"
+          >
+            <span className="text-amber-500 flex-shrink-0">
+              <ShieldIcon />
+            </span>
             <p className="text-xs text-amber-700 font-medium">
               Enter the 6-digit OTP — it expires in 10 minutes.
             </p>
@@ -430,7 +536,9 @@ function ModalContent({
           </div>
 
           {error && (
-            <p className="text-xs text-red-500 mb-3 text-center font-medium">{error}</p>
+            <p className="text-xs text-red-500 mb-3 text-center font-medium">
+              {error}
+            </p>
           )}
 
           <button
@@ -446,7 +554,9 @@ function ModalContent({
           >
             {loading ? (
               <span className="w-5 h-5 border-2 border-[#0f2342]/30 border-t-[#0f2342] rounded-full animate-spin" />
-            ) : "Verify & Sign In"}
+            ) : (
+              "Verify & Sign In"
+            )}
           </button>
 
           {/* Resend row */}
@@ -455,19 +565,42 @@ function ModalContent({
               <div className="flex items-center justify-center gap-2">
                 <div className="relative w-6 h-6">
                   <svg className="w-6 h-6 -rotate-90" viewBox="0 0 24 24">
-                    <circle cx="12" cy="12" r="10" fill="none" stroke="#e2e8f0" strokeWidth="2" />
-                    <circle cx="12" cy="12" r="10" fill="none" stroke="#f59e0b" strokeWidth="2"
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      fill="none"
+                      stroke="#e2e8f0"
+                      strokeWidth="2"
+                    />
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      fill="none"
+                      stroke="#f59e0b"
+                      strokeWidth="2"
                       strokeDasharray={`${(timer / 30) * 62.8} 62.8`}
-                      strokeLinecap="round" />
+                      strokeLinecap="round"
+                    />
                   </svg>
-                  <span className="absolute inset-0 flex items-center justify-center
-                    text-[8px] font-bold text-amber-600">{timer}</span>
+                  <span
+                    className="absolute inset-0 flex items-center justify-center
+                    text-[8px] font-bold text-amber-600"
+                  >
+                    {timer}
+                  </span>
                 </div>
-                <span className="text-sm text-slate-500">Resend OTP in {timer}s</span>
+                <span className="text-sm text-slate-500">
+                  Resend OTP in {timer}s
+                </span>
               </div>
             ) : (
               <button
-                onClick={() => { setOtp(""); sendOtp(); }}
+                onClick={() => {
+                  setOtp("");
+                  sendOtp();
+                }}
                 className="text-sm text-amber-500 font-bold hover:underline
                   border-none bg-transparent cursor-pointer font-[inherit]"
                 style={{ WebkitTapHighlightColor: "transparent" }}
@@ -482,7 +615,10 @@ function ModalContent({
       {/* Register nudge */}
       <p className="text-center text-xs text-slate-500 mt-5">
         New to Think4BuySale?{" "}
-        <a href="#" className="text-[#0f2342] font-bold no-underline hover:text-amber-500 transition-colors">
+        <a
+          href="#"
+          className="text-[#0f2342] font-bold no-underline hover:text-amber-500 transition-colors"
+        >
           Create Account
         </a>
       </p>

@@ -67,9 +67,9 @@ const HomeSearch: React.FC = () => {
       <div className="font-[DM_Sans,sans-serif]">
         {/* ── HERO SECTION ── */}
         <section
-          className="relative bg-gradient-to-br from-[#0f2342] via-[#1a3a6e] to-[#0d3060]
-          flex flex-col items-center justify-center text-center
-          px-4 md:px-6 pt-10 pb-8 md:py-16 overflow-hidden"
+          className="relative bg-gradient-to-br from-[#0B3C8C] via-[#1E40AF] to-[#3B82F6]
+  flex flex-col items-center justify-center text-center
+  px-4 md:px-6 pt-10 pb-8 md:py-16 overflow-hidden"
         >
           {/* Dot texture */}
           <div

@@ -4,6 +4,9 @@ import React, { useState, useRef, useEffect } from "react";
 import LoginModal from "./Login";
 import RegisterModal from "./RegisterModal";
 import MobileSearchOverlay from "./MobileSearchOverlay";
+import { useAppSelector, useAppDispatch } from "@/store/hooks";
+import { logout } from "@/store/slices/authSlice";
+import ProfileIcon from "@/svg/ProfileIcon";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,6 +20,82 @@ interface NavItem {
   href?: string;
   columns?: DropdownColumn[];
 }
+
+const ProfileDropdown = ({ user }: { user: any }) => {
+  const [open, setOpen] = useState(false);
+  const dispatch = useAppDispatch();
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative hidden md:flex items-center gap-3">
+      {/* Welcome Text */}
+      <span className="text-sm font-semibold text-[#0F2D5C]">
+        Welcome, {user?.username}
+      </span>
+
+      {/* Profile Button */}
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-10 h-10 rounded-full border border-slate-200
+        flex items-center justify-center bg-white
+        hover:bg-slate-50 hover:border-[#0f2342]
+        transition-all shadow-sm"
+      >
+        <ProfileIcon />
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div
+          className="absolute right-0 top-14 w-56 bg-white rounded-2xl
+          shadow-2xl border border-slate-200 overflow-hidden
+          animate-[ddFadeIn_0.15s_ease] z-[500]"
+        >
+          <div className="px-4 py-3 border-b border-slate-100">
+            <p className="text-sm font-semibold text-[#0F2D5C]">
+              Hi, {user?.username}
+            </p>
+            <p className="text-xs text-slate-400">{user?.phone}</p>
+          </div>
+
+          <a
+            href="/my-dashboard"
+            className="block px-4 py-3 text-sm text-slate-600
+            hover:bg-slate-50 no-underline"
+          >
+            Dashboard
+          </a>
+
+          <a
+            href="/post-property"
+            className="block px-4 py-3 text-sm text-slate-600
+            hover:bg-slate-50 no-underline"
+          >
+            Post Property
+          </a>
+
+          <button
+            onClick={() => dispatch(logout())}
+            className="w-full text-left px-4 py-3 text-sm text-red-600
+            hover:bg-red-50 border-none bg-transparent cursor-pointer"
+          >
+            Logout
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -132,18 +211,15 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const CITIES = [
-  "Delhi", "Mumbai", "Bangalore", "Hyderabad",
-  "Chennai", "Pune", "Kolkata", "Noida", "Gurgaon",
-];
-
-// ─── Quick access tiles shown on mobile hero ──────────────────────────────────
-const QUICK_TILES = [
-  { label: "Buy", icon: "🏠", href: "#" },
-  { label: "Rent", icon: "🔑", href: "#" },
-  { label: "Projects", icon: "🏗️", href: "#" },
-  { label: "Commercial", icon: "🏢", href: "#" },
-  { label: "PG", icon: "🛏️", href: "#" },
-  { label: "Plots", icon: "📐", href: "#" },
+  "Delhi",
+  "Mumbai",
+  "Bangalore",
+  "Hyderabad",
+  "Chennai",
+  "Pune",
+  "Kolkata",
+  "Noida",
+  "Gurgaon",
 ];
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -156,8 +232,12 @@ const HomeIcon = () => (
 
 const ChevronDown = ({ open = false }: { open?: boolean }) => (
   <svg
-    width="14" height="14" fill="none" stroke="currentColor"
-    strokeWidth="2.5" viewBox="0 0 24 24"
+    width="14"
+    height="14"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    viewBox="0 0 24 24"
     className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`}
   >
     <path d="M6 9l6 6 6-6" />
@@ -165,55 +245,77 @@ const ChevronDown = ({ open = false }: { open?: boolean }) => (
 );
 
 const MapPinIcon = () => (
-  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-amber-500">
+  <svg
+    width="14"
+    height="14"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    viewBox="0 0 24 24"
+    className="text-[#2563EB]"
+  >
     <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
     <circle cx="12" cy="9" r="2.5" />
   </svg>
 );
 
 const SearchIconGray = () => (
-  <svg width="16" height="16" fill="none" stroke="#94a3b8" strokeWidth="2" viewBox="0 0 24 24">
-    <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-  </svg>
-);
-
-const SearchIconWhite = () => (
-  <svg width="17" height="17" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2" viewBox="0 0 24 24">
-    <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+  <svg
+    width="16"
+    height="16"
+    fill="none"
+    stroke="#94a3b8"
+    strokeWidth="2"
+    viewBox="0 0 24 24"
+  >
+    <circle cx="11" cy="11" r="8" />
+    <path d="m21 21-4.35-4.35" />
   </svg>
 );
 
 const UserIcon = () => (
-  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+  <svg
+    width="14"
+    height="14"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    viewBox="0 0 24 24"
+  >
     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
     <circle cx="12" cy="7" r="4" />
   </svg>
 );
 
-
 // ─── MegaDropdown (desktop only) ──────────────────────────────────────────────
 
-const MegaDropdown: React.FC<{ columns: DropdownColumn[]; isVisible: boolean }> = ({
-  columns, isVisible,
-}) => {
+const MegaDropdown: React.FC<{
+  columns: DropdownColumn[];
+  isVisible: boolean;
+}> = ({ columns, isVisible }) => {
   if (!isVisible) return null;
   const isSingle = columns.length === 1;
   return (
-    <div className={`
+    <div
+      className={`
       absolute top-[calc(100%+8px)] left-0 bg-white rounded-2xl
       border border-slate-200 shadow-2xl p-5 z-[300]
       animate-[ddFadeIn_0.18s_ease] grid gap-6
       ${isSingle ? "grid-cols-1 min-w-[220px]" : "grid-cols-3 min-w-[680px]"}
-    `}>
+    `}
+    >
       {columns.map((col) => (
         <div key={col.heading}>
-          <h4 className="text-[10px] font-semibold tracking-[0.12em] uppercase text-amber-500 mb-3 pb-2 border-b border-slate-200">
+          <h4 className="text-[10px] font-semibold tracking-[0.12em] uppercase text-[#2563EB] mb-3 pb-2 border-b border-slate-200">
             {col.heading}
           </h4>
           {col.links.map((link) => (
-            <a key={link.label} href={link.href}
+            <a
+              key={link.label}
+              href={link.href}
               className={`block text-[13px] py-[5px] transition-all duration-150 hover:pl-1 no-underline
-                ${link.viewAll ? "font-medium text-amber-500 mt-1" : "font-normal text-slate-500 hover:text-[#0f2342]"}`}>
+                ${link.viewAll ? "font-medium text-[#2563EB] mt-1" : "font-normal text-slate-500 hover:text-[#0F2D5C]"}`}
+            >
               {link.label}
             </a>
           ))}
@@ -231,7 +333,8 @@ const NavLink: React.FC<{ item: NavItem }> = ({ item }) => {
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -239,19 +342,28 @@ const NavLink: React.FC<{ item: NavItem }> = ({ item }) => {
 
   if (!item.columns) {
     return (
-      <a href={item.href}
-        className="flex items-center gap-[5px] px-[14px] py-2 text-sm font-medium text-[#0f2342]
+      <a
+        href={item.href}
+        className="flex items-center gap-[5px] px-[14px] py-2 text-sm font-medium text-[#0F2D5C]
           rounded-lg whitespace-nowrap transition-all duration-150 hover:bg-slate-100
-          hover:text-amber-500 no-underline">
+          hover:text-[#2563EB] no-underline"
+      >
         {item.label}
       </a>
     );
   }
   return (
-    <div ref={ref} className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-      <button className={`flex items-center gap-[5px] px-[14px] py-2 text-sm font-medium rounded-lg
+    <div
+      ref={ref}
+      className="relative"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      <button
+        className={`flex items-center gap-[5px] px-[14px] py-2 text-sm font-medium rounded-lg
         border-none whitespace-nowrap transition-all duration-150 font-[inherit] cursor-pointer
-        ${open ? "bg-slate-100 text-amber-500" : "bg-transparent text-[#0f2342]"}`}>
+        ${open ? "bg-slate-100 text-[#2563EB]" : "bg-transparent text-[#0F2D5C]"}`}
+      >
         {item.label}
         <ChevronDown open={open} />
       </button>
@@ -267,8 +379,11 @@ const RealEstateHeader: React.FC = () => {
   const [mobileAccordion, setMobileAccordion] = useState<string | null>(null);
   const [city, setCity] = useState("Delhi");
   const [cityOpen, setCityOpen] = useState(false);
-  const [searchType, setSearchType] = useState("Buy");
-  const [searchQuery, setSearchQuery] = useState("");
+  const { user, isAuthenticated, loading } = useAppSelector(
+    (state: any) => state.auth,
+  );
+
+  const dispatch = useAppDispatch();
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [overlayQuery, setOverlayQuery] = useState("");
   const [loginOpen, setLoginOpen] = useState(false);
@@ -283,7 +398,8 @@ const RealEstateHeader: React.FC = () => {
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (cityRef.current && !cityRef.current.contains(e.target as Node)) setCityOpen(false);
+      if (cityRef.current && !cityRef.current.contains(e.target as Node))
+        setCityOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -291,7 +407,9 @@ const RealEstateHeader: React.FC = () => {
 
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [mobileOpen]);
 
   return (
@@ -327,24 +445,36 @@ const RealEstateHeader: React.FC = () => {
       />
 
       <div className="font-[DM_Sans,sans-serif]">
-
         {/* ── TOP BAR — desktop only ── */}
-        <div className="hidden md:block bg-[#0f2342] text-white/65 text-xs tracking-wide py-[7px]">
+        <div className="hidden md:block bg-gradient-to-br bg-gradient-to-br from-[#0B3C8C] via-[#1E40AF] to-[#3B82F6] text-white/65 text-xs tracking-wide py-[7px]">
           <div className="max-w-[1280px] mx-auto px-6 flex justify-between items-center flex-wrap gap-3">
             <div className="flex gap-5 items-center">
               <span>📞 8285-25-76-36</span>
               <span className="opacity-30">|</span>
-              <a href="mailto:support@think4buysale.in"
-                className="text-white/65 no-underline hover:text-white transition-colors">
+              <a
+                href="mailto:support@think4buysale.in"
+                className="text-white/65 no-underline hover:text-white transition-colors"
+              >
                 support@think4buysale.in
               </a>
             </div>
             <div className="flex gap-5 items-center">
               {["For Builders", "Advertise", "Download App"].map((t) => (
-                <a key={t} href="#" className="text-white/65 no-underline hover:text-white transition-colors">{t}</a>
+                <a
+                  key={t}
+                  href="#"
+                  className="text-white/65 no-underline hover:text-white transition-colors"
+                >
+                  {t}
+                </a>
               ))}
               <span className="opacity-30">|</span>
-              <a href="#" className="text-white/65 no-underline hover:text-white transition-colors">🇮🇳 India</a>
+              <a
+                href="#"
+                className="text-white/65 no-underline hover:text-white transition-colors"
+              >
+                🇮🇳 India
+              </a>
             </div>
           </div>
         </div>
@@ -352,23 +482,26 @@ const RealEstateHeader: React.FC = () => {
         {/* ── MAIN HEADER ── */}
         <header className="bg-white shadow-[0_2px_16px_rgba(15,35,66,0.10)] sticky top-0 z-[100]">
           <div className="max-w-[1280px] mx-auto px-3 md:px-6 flex items-center h-14 md:h-[70px] gap-2 md:gap-6">
-
             {/* LOGO */}
-            <a href="/" className="flex items-center gap-2 no-underline shrink-0">
-              <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-[#0f2342] via-[#0f2342] to-[#c9a84c] rounded-[9px] flex items-center justify-center shadow-sm">
+            <a
+              href="/"
+              className="flex items-center gap-2 no-underline shrink-0"
+            >
+              <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] text-white
+hover:from-[#1D4ED8] hover:to-[#1E40AF] rounded-[9px] flex items-center justify-center shadow-sm">
                 <HomeIcon />
               </div>
               <div className="hidden xs:block">
-                <div className="font-[Playfair_Display,serif] text-base md:text-xl font-bold text-[#0f2342] leading-none">
+                <div className="font-[Playfair_Display,serif] text-base md:text-xl font-bold text-[#0F2D5C] leading-none">
                   Think4BuySale
                 </div>
-                <div className="text-[8px] font-semibold text-amber-500 tracking-[0.15em] uppercase">
+                <div className="text-[8px] font-semibold text-[#2563EB] tracking-[0.15em] uppercase">
                   India's Premier Realty
                 </div>
               </div>
               {/* Compact logo text on tiny screens */}
               {/* <div className="xs:hidden">
-                <div className="font-[Playfair_Display,serif] text-sm font-bold text-[#0f2342] leading-none">T4BS</div>
+                <div className="font-[Playfair_Display,serif] text-sm font-bold text-[#0F2D5C] leading-none">T4BS</div>
               </div> */}
             </a>
 
@@ -380,10 +513,14 @@ const RealEstateHeader: React.FC = () => {
                 transition-colors active:bg-slate-100"
             >
               <SearchIconGray />
-              <span className="truncate text-sm text-slate-400 flex-1">Search properties…</span>
+              <span className="truncate text-sm text-slate-400 flex-1">
+                Search properties…
+              </span>
               {city && (
-                <span className="hidden xs:flex items-center gap-1 text-xs text-amber-600 font-medium
-                  bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full shrink-0">
+                <span
+                  className="hidden xs:flex items-center gap-1 text-xs text-[#2563EB] font-medium
+                  hover:border-[#1E3A8A] border border-slate-200 px-2 py-0.5 rounded-full shrink-0"
+                >
                   <MapPinIcon />
                   {city}
                 </span>
@@ -395,7 +532,7 @@ const RealEstateHeader: React.FC = () => {
               <button
                 onClick={() => setCityOpen(!cityOpen)}
                 className="flex items-center gap-[6px] border border-slate-200 rounded-lg px-[14px]
-                  py-[7px] cursor-pointer bg-[#fdf8f0] text-[13px] font-medium text-[#0f2342]
+                  py-[7px] cursor-pointer hover:border-[#1E3A8A] text-[13px] font-medium text-[#0F2D5C]
                   whitespace-nowrap font-[inherit] transition-colors hover:border-[#0f2342]"
               >
                 <MapPinIcon />
@@ -403,15 +540,21 @@ const RealEstateHeader: React.FC = () => {
                 <ChevronDown open={cityOpen} />
               </button>
               {cityOpen && (
-                <div className="absolute top-[calc(100%+8px)] left-0 bg-white border border-slate-200
+                <div
+                  className="absolute top-[calc(100%+8px)] left-0 bg-white border border-slate-200
                   rounded-[10px] shadow-[0_8px_24px_rgba(15,35,66,0.12)] z-[300] overflow-hidden
-                  min-w-[160px] animate-[ddFadeIn_0.15s_ease]">
+                  min-w-[160px] animate-[ddFadeIn_0.15s_ease]"
+                >
                   {CITIES.map((c) => (
-                    <button key={c}
-                      onClick={() => { setCity(c); setCityOpen(false); }}
+                    <button
+                      key={c}
+                      onClick={() => {
+                        setCity(c);
+                        setCityOpen(false);
+                      }}
                       className={`block w-full text-left px-4 py-[9px] text-[13px] border-none
                         cursor-pointer font-[inherit] transition-colors hover:bg-slate-100
-                        ${c === city ? "font-semibold text-amber-500 bg-[#fdf8f0]" : "font-normal text-[#0f2342] bg-transparent"}`}
+                        ${c === city ? "font-semibold text-[#2563EB] hover:border-[#1E3A8A]" : "font-normal text-[#0F2D5C] bg-transparent"}`}
                     >
                       {c}
                     </button>
@@ -422,39 +565,57 @@ const RealEstateHeader: React.FC = () => {
 
             {/* DESKTOP NAV */}
             <nav className="hidden lg:flex items-center gap-0.5 flex-1">
-              {NAV_ITEMS.map((item) => <NavLink key={item.label} item={item} />)}
+              {NAV_ITEMS.map((item) => (
+                <NavLink key={item.label} item={item} />
+              ))}
             </nav>
 
             {/* ACTIONS */}
             <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
-
               {/* Sign In — desktop */}
-              <button onClick={() => setLoginOpen(true)}
-                className="hidden md:flex items-center gap-[6px] px-4 py-2 text-[13px] font-medium
-                  text-[#0f2342] border border-slate-200 rounded-lg whitespace-nowrap
-                  transition-all hover:border-[#0f2342] hover:bg-slate-100">
-                <UserIcon />
-                Sign In
-              </button>
+              {/* AUTH SECTION — desktop */}
+              {loading ? null : !isAuthenticated ? (
+                <>
+                  <button
+                    onClick={() => setLoginOpen(true)}
+                    className="hidden md:flex items-center gap-[6px] px-4 py-2 text-[13px] font-medium
+      text-[#0F2D5C] border border-slate-200 rounded-lg whitespace-nowrap
+      transition-all hover:border-[#0f2342] hover:bg-slate-100"
+                  >
+                    <UserIcon />
+                    Sign In
+                  </button>
 
-              {/* Register — desktop */}
-              <button onClick={() => setRegisterOpen(true)}
-                className="hidden md:flex items-center gap-[6px] px-4 py-2 text-[13px] font-medium
-                  text-amber-600 border border-amber-400 rounded-lg whitespace-nowrap
-                  transition-all hover:bg-amber-50">
-                Register
-              </button>
+                  <button
+                    onClick={() => setRegisterOpen(true)}
+                    className="hidden md:flex items-center gap-[6px] px-4 py-2 text-[13px] font-medium
+      text-amber-600 border border-amber-400 rounded-lg whitespace-nowrap
+      transition-all hover:bg-amber-50"
+                  >
+                    Register
+                  </button>
+                </>
+              ) : (
+                <ProfileDropdown user={user} />
+              )}
 
               {/* Post Property — always visible, shorter on mobile */}
-              <a href="/post-property/guest"
+              <a
+                href={
+                  isAuthenticated ? "/post-property" : "/post-property/guest"
+                }
                 className="flex items-center gap-1.5 px-3 md:px-5 py-2 md:py-[9px] text-xs md:text-[13px]
-                  font-bold text-white bg-gradient-to-br from-[#0f2342] to-[#1a3a6e] rounded-lg
+                  font-bold text-white bg-gradient-to-r from-[#2563EB] to-[#1D4ED8] text-white
+hover:from-[#1D4ED8] hover:to-[#1E40AF]  rounded-lg
                   no-underline whitespace-nowrap transition-all hover:-translate-y-px
-                  hover:shadow-[0_6px_20px_rgba(15,35,66,0.25)] active:scale-[0.97]">
+                  hover:shadow-[0_6px_20px_rgba(15,35,66,0.25)] active:scale-[0.97]"
+              >
                 <span className="hidden sm:inline">Post Property</span>
                 <span className="sm:hidden">Post</span>
-                <span className="bg-amber-400 text-[#0f2342] text-[8px] md:text-[9px] font-black
-                  tracking-wide px-1 md:px-[5px] py-[2px] rounded-[3px]">
+                <span
+                  className="bg-amber-400 text-[#0F2D5C] text-[8px] md:text-[9px] font-black
+                  tracking-wide px-1 md:px-[5px] py-[2px] rounded-[3px]"
+                >
                   FREE
                 </span>
               </a>
@@ -466,32 +627,44 @@ const RealEstateHeader: React.FC = () => {
                   p-2 border-none bg-none rounded-lg active:bg-slate-100"
                 aria-label="Toggle menu"
               >
-                <span className={`block w-[20px] h-[2px] bg-[#0f2342] rounded-sm transition-all duration-200
-                  ${mobileOpen ? "translate-y-[7px] rotate-45" : ""}`} />
-                <span className={`block w-[20px] h-[2px] bg-[#0f2342] rounded-sm transition-all duration-200
-                  ${mobileOpen ? "opacity-0" : ""}`} />
-                <span className={`block w-[20px] h-[2px] bg-[#0f2342] rounded-sm transition-all duration-200
-                  ${mobileOpen ? "-translate-y-[7px] -rotate-45" : ""}`} />
+                <span
+                  className={`block w-[20px] h-[2px] bg-[#0F2D5C] rounded-sm transition-all duration-200
+                  ${mobileOpen ? "translate-y-[7px] rotate-45" : ""}`}
+                />
+                <span
+                  className={`block w-[20px] h-[2px] bg-[#0F2D5C] rounded-sm transition-all duration-200
+                  ${mobileOpen ? "opacity-0" : ""}`}
+                />
+                <span
+                  className={`block w-[20px] h-[2px] bg-[#0F2D5C] rounded-sm transition-all duration-200
+                  ${mobileOpen ? "-translate-y-[7px] -rotate-45" : ""}`}
+                />
               </button>
             </div>
           </div>
 
           {/* ── MOBILE DRAWER MENU ── */}
           {mobileOpen && (
-            <div className="lg:hidden bg-white border-t border-slate-100
-              animate-[slideDown_0.2s_ease] overflow-y-auto overscroll-contain max-h-[85vh]">
-
+            <div
+              className="lg:hidden bg-white border-t border-slate-100
+              animate-[slideDown_0.2s_ease] overflow-y-auto overscroll-contain max-h-[85vh]"
+            >
               {/* City pills */}
               <div className="px-4 py-3 border-b border-slate-100">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Your City</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
+                  Your City
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {CITIES.map((c) => (
-                    <button key={c} onClick={() => setCity(c)}
+                    <button
+                      key={c}
+                      onClick={() => setCity(c)}
                       className={`px-3 py-1.5 text-xs rounded-full border font-semibold
                         transition-all cursor-pointer font-[inherit] active:scale-95
-                        ${c === city
-                          ? "bg-amber-500 border-amber-500 text-white shadow-sm"
-                          : "bg-white border-slate-200 text-[#0f2342] active:bg-amber-50 active:border-amber-400"
+                        ${
+                          c === city
+                            ? "bg-amber-500 border-amber-500 text-white shadow-sm"
+                            : "bg-white border-slate-200 text-[#0F2D5C] active:bg-amber-50 active:border-amber-400"
                         }`}
                     >
                       {c}
@@ -507,9 +680,15 @@ const RealEstateHeader: React.FC = () => {
                     {item.columns ? (
                       <>
                         <button
-                          onClick={() => setMobileAccordion(mobileAccordion === item.label ? null : item.label)}
+                          onClick={() =>
+                            setMobileAccordion(
+                              mobileAccordion === item.label
+                                ? null
+                                : item.label,
+                            )
+                          }
                           className="flex w-full justify-between items-center px-4 py-4
-                            text-[15px] font-medium text-[#0f2342] bg-transparent border-none
+                            text-[15px] font-medium text-[#0F2D5C] bg-transparent border-none
                             cursor-pointer font-[inherit] active:bg-slate-50"
                         >
                           {item.label}
@@ -519,18 +698,21 @@ const RealEstateHeader: React.FC = () => {
                           <div className="bg-slate-50 px-4 pb-4 animate-[slideDown_0.15s_ease]">
                             {item.columns.map((col) => (
                               <div key={col.heading} className="mb-4">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-500 mb-2 mt-3">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-[#2563EB] mb-2 mt-3">
                                   {col.heading}
                                 </p>
                                 {/* 2-column grid for links on mobile = easier scanning */}
                                 <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
                                   {col.links.map((link) => (
-                                    <a key={link.label} href={link.href}
+                                    <a
+                                      key={link.label}
+                                      href={link.href}
                                       className={`text-[13px] py-2 no-underline transition-colors
-                                        active:text-amber-500
-                                        ${link.viewAll
-                                          ? "col-span-2 text-amber-500 font-semibold mt-1"
-                                          : "text-slate-600"
+                                        active:text-[#2563EB]
+                                        ${
+                                          link.viewAll
+                                            ? "col-span-2 text-[#2563EB] font-semibold mt-1"
+                                            : "text-slate-600"
                                         }`}
                                     >
                                       {link.label}
@@ -543,9 +725,11 @@ const RealEstateHeader: React.FC = () => {
                         )}
                       </>
                     ) : (
-                      <a href={item.href || "#"}
+                      <a
+                        href={item.href || "#"}
                         className="flex justify-between items-center px-4 py-4 text-[15px]
-                          font-medium text-[#0f2342] no-underline active:bg-slate-50">
+                          font-medium text-[#0F2D5C] no-underline active:bg-slate-50"
+                      >
                         {item.label}
                       </a>
                     )}
@@ -555,20 +739,55 @@ const RealEstateHeader: React.FC = () => {
 
               {/* Auth buttons */}
               <div className="px-4 pt-4 pb-safe pb-6 flex flex-col gap-3 border-t border-slate-100">
-                <button onClick={() => { setMobileOpen(false); setLoginOpen(true); }}
-                  className="flex items-center justify-center gap-2 py-3.5 text-[15px] font-semibold
-                    text-[#0f2342] border-2 border-slate-200 rounded-2xl active:bg-slate-50">
-                  <UserIcon />
-                  Sign In
-                </button>
-                <button onClick={() => { setMobileOpen(false); setRegisterOpen(true); }}
-                  className="flex items-center justify-center gap-2 py-3.5 text-[15px] font-semibold
-                    text-amber-600 border-2 border-amber-400 rounded-2xl bg-amber-50 active:bg-amber-100">
-                  Create Free Account
-                </button>
-                <a href="#"
+                {!isAuthenticated ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        setMobileOpen(false);
+                        setLoginOpen(true);
+                      }}
+                      className="flex items-center justify-center gap-2 py-3.5 text-[15px] font-semibold
+          text-[#0F2D5C] border-2 border-slate-200 rounded-2xl active:bg-slate-50"
+                    >
+                      <UserIcon />
+                      Sign In
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setMobileOpen(false);
+                        setRegisterOpen(true);
+                      }}
+                      className="flex items-center justify-center gap-2 py-3.5 text-[15px] font-semibold
+          text-amber-600 border-2 border-amber-400 rounded-2xl bg-amber-50 active:bg-amber-100"
+                    >
+                      Create Free Account
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-center text-[#0F2D5C] font-semibold">
+                      Hi, {user?.username}
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        dispatch(logout());
+                        setMobileOpen(false);
+                      }}
+                      className="flex items-center justify-center gap-2 py-3.5 text-[15px] font-semibold
+          text-red-600 border-2 border-red-400 rounded-2xl bg-red-50 active:bg-red-100"
+                    >
+                      Logout
+                    </button>
+                  </>
+                )}
+
+                <a
+                  href="/post-property"
                   className="flex items-center justify-center gap-2 py-3.5 text-[15px] font-bold
-                    text-white bg-gradient-to-br from-[#0f2342] to-[#1a3a6e] rounded-2xl no-underline active:opacity-90">
+      text-white bg-gradient-to-br from-[#0f2342] to-[#1a3a6e] rounded-2xl no-underline active:opacity-90"
+                >
                   Post FREE Property
                 </a>
               </div>
@@ -578,7 +797,10 @@ const RealEstateHeader: React.FC = () => {
       </div>
 
       <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} />
-      <RegisterModal open={registerOpen} onClose={() => setRegisterOpen(false)} />
+      <RegisterModal
+        open={registerOpen}
+        onClose={() => setRegisterOpen(false)}
+      />
     </>
   );
 };

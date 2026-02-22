@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import TopHeader from  "./component/TopHeader"
+import TopHeader from "./component/TopHeader";
+import Providers from "./Providers";
+import { Suspense } from "react";
+import GlobalLoading from "./loading";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -50,12 +53,15 @@ export default function RootLayout({
         .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
         .pb-safe { padding-bottom: env(safe-area-inset-bottom, 16px); }
       `}</style>
-      
-        <div className="font-[DM_Sans,sans-serif]">
-          <TopHeader />
-        </div>
-        
-        {children}
+        <Providers>
+          <div className="font-[DM_Sans,sans-serif]">
+            <TopHeader />
+          </div>
+
+          <Suspense fallback={<GlobalLoading />}>
+            {children}
+          </Suspense>
+        </Providers>
       </body>
     </html>
   );
