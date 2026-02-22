@@ -252,7 +252,7 @@ export default function PostPropertyForm() {
   const [submitted, setSubmitted]   = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle"|"saving"|"saved"|"error">("idle");
-  const [data, setRaw]              = useState<FormData>(INITIAL);
+  const [data, setRaw]              = useState<any>(INITIAL);
   const [loadState, setLoadState]   = useState<"idle"|"loading"|"error">(
     paramId ? "loading" : "idle"
   );
