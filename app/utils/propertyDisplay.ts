@@ -13,7 +13,7 @@
 // All relative paths from the API are prefixed with this.
 // Set NEXT_PUBLIC_API_BASE_URL=http://localhost:3001 in .env.local
 const API_BASE =
-  (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
+  (process.env.NEXT_PUBLIC_BASE_URL ?? "").replace(/\/$/, "");
 
 /**
  * Converts a relative server path to a full URL.

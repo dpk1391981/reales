@@ -26,7 +26,7 @@ import { Support }         from "./sections/Support";
 
 // ─── DISPLAY UTILS ────────────────────────────────────────────────────────────
 // imgUrl: build full avatar/profile image URL from a relative path
-const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
+const API_BASE = (process.env.NEXT_PUBLIC_BASE_URL ?? "").replace(/\/$/, "");
 const imgUrl = (path: string | null | undefined): string | undefined => {
   if (!path) return undefined;
   if (path.startsWith("http://") || path.startsWith("https://")) return path;
