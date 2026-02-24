@@ -1,343 +1,279 @@
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import type { PayloadAction } from "@reduxjs/toolkit";
+// src/store/slices/propertySlice.ts
+// ─────────────────────────────────────────────────────────────────────────────
+// Redux slice for property operations.
+//
+// Critical: saveDraft and publishProperty thunks receive a `files` argument
+// (File[]) and pass it directly to the API layer. Redux actions are
+// NOT serializable with File objects — we thread them through the thunk
+// without ever storing them in Redux state (they live only in component state).
+// ─────────────────────────────────────────────────────────────────────────────
 
+import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import {
-  publishPropertyApi,
+  getPropertyApi,
   saveDraftApi,
-  updatePropertyApi,
+  publishPropertyApi,
   deletePropertyApi,
   browsePropertiesApi,
-  getPropertyApi,
   getMyPropertiesApi,
-  getPropertyQuotaApi,
-  buyBoostApi,
-  getActiveBoostsApi,
-  cancelBoostApi,
-  getWalletBalanceApi,
-  getWalletTransactionsApi,
+  type PropertyPayload,
+  type DraftPayload,
+  type BrowseFilters,
 } from "@/services/propertyApi";
 
-import type {
-  PropertyPayload,
-  DraftPayload,
-  BrowseFilters,
-} from "@/services/propertyApi";
-
-/* ─────────────────────────────────────────────
-   STATE TYPES
-───────────────────────────────────────────── */
+// ─── State ────────────────────────────────────────────────────────────────────
 
 interface PropertyState {
-  properties: any[];
-  myProperties: any[];
   selectedProperty: any | null;
-
-  quota: any | null;
-  boosts: any[];
-
-  walletBalance: any | null;
-  walletTransactions: any[];
-
-  loading: boolean;
-  error: string | null;
+  myListings:       any[];
+  browseResults:    any[];
+  loading:          boolean;
+  error:            string | null;
 }
 
 const initialState: PropertyState = {
-  properties: [],
-  myProperties: [],
   selectedProperty: null,
-
-  quota: null,
-  boosts: [],
-
-  walletBalance: null,
-  walletTransactions: [],
-
-  loading: false,
-  error: null,
+  myListings:       [],
+  browseResults:    [],
+  loading:          false,
+  error:            null,
 };
 
-/* ─────────────────────────────────────────────
-   THUNKS (FULLY TYPESAFE)
-───────────────────────────────────────────── */
+// ─── THUNKS ───────────────────────────────────────────────────────────────────
 
-// ✅ Publish
-export const publishProperty = createAsyncThunk<
-  any,
-  { payload: PropertyPayload; files: File[] },
-  { rejectValue: string }
->("property/publish", async (args, { rejectWithValue }) => {
-  try {
-    const { data } = await publishPropertyApi(args.payload, args.files);
-    return data;
-  } catch (err: any) {
-    return rejectWithValue(err?.response?.data?.message || "Publish failed");
-  }
-});
-
-// ✅ Save Draft
-export const saveDraft = createAsyncThunk<
-  any,
-  { payload: DraftPayload; files?: File[] },
-  { rejectValue: string }
->("property/saveDraft", async (args, { rejectWithValue }) => {
-  try {
-    const { data } = await saveDraftApi(args.payload, args.files || []);
-    return data;
-  } catch {
-    return rejectWithValue("Draft save failed");
-  }
-});
-
-// ✅ Update
-export const updateProperty = createAsyncThunk<
-  any,
-  { id: number; payload: Partial<PropertyPayload>; files?: File[] },
-  { rejectValue: string }
->("property/update", async (args, { rejectWithValue }) => {
-  try {
-    const { data } = await updatePropertyApi(
-      args.id,
-      args.payload,
-      args.files || [],
-    );
-    return data;
-  } catch {
-    return rejectWithValue("Update failed");
-  }
-});
-
-// ✅ Delete
-export const deleteProperty = createAsyncThunk<
-  number,
-  number,
-  { rejectValue: string }
->("property/delete", async (id, { rejectWithValue }) => {
-  try {
-    await deletePropertyApi(id);
-    return id;
-  } catch {
-    return rejectWithValue("Delete failed");
-  }
-});
-
-// ✅ Browse
-export const browseProperties = createAsyncThunk<
-  any,
-  BrowseFilters | undefined,
-  { rejectValue: string }
->("property/browse", async (filters, { rejectWithValue }) => {
-  try {
-    const { data } = await browsePropertiesApi(filters);
-    return data;
-  } catch {
-    return rejectWithValue("Browse failed");
-  }
-});
-
-// ✅ Get Single
-export const getProperty = createAsyncThunk<
-  any,
-  string | number,
-  { rejectValue: string }
->("property/getOne", async (idOrSlug, { rejectWithValue }) => {
-  try {
-    const { data } = await getPropertyApi(idOrSlug);
-    return data;
-  } catch {
-    return rejectWithValue("Failed to fetch property");
-  }
-});
-
-// ✅ My Properties
-export const getMyProperties = createAsyncThunk<
-  any,
-  string | undefined,
-  { rejectValue: string }
->("property/my", async (status, { rejectWithValue }) => {
-  try {
-    const { data } = await getMyPropertiesApi(status);
-    return data;
-  } catch {
-    return rejectWithValue("Failed to fetch my properties");
-  }
-});
-
-// ✅ Quota
-export const getQuota = createAsyncThunk<any, void, { rejectValue: string }>(
-  "property/quota",
-  async (_, { rejectWithValue }) => {
+/**
+ * GET /properties/:idOrSlug
+ * Loads a single property for the edit/view form.
+ * Returns the raw API response so the form can call apiToForm() on it.
+ */
+export const getProperty = createAsyncThunk(
+  "property/getOne",
+  async (idOrSlug: string | number, { rejectWithValue }) => {
     try {
-      const { data } = await getPropertyQuotaApi();
-      return data;
-    } catch {
-      return rejectWithValue("Failed to fetch quota");
+      const res = await getPropertyApi(idOrSlug);
+      return res.data;
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ??
+        err?.response?.data?.error   ??
+        err?.message                 ??
+        "Failed to load property";
+      return rejectWithValue(
+        Array.isArray(msg) ? msg.join("; ") : msg
+      );
     }
-  },
+  }
 );
 
-// ✅ Buy Boost
-export const buyBoost = createAsyncThunk<
-  any,
-  { propertyId: number; packageId: number },
-  { rejectValue: string }
->("property/buyBoost", async (args, { rejectWithValue }) => {
-  try {
-    const { data } = await buyBoostApi(args.propertyId, args.packageId);
-    return data;
-  } catch {
-    return rejectWithValue("Boost purchase failed");
+/**
+ * PUT /properties/draft
+ * Auto-save or manual-save a draft.
+ * Does NOT consume quota or wallet tokens.
+ *
+ * ⚠️ files (File[]) is passed as a thunk argument — it never goes into Redux
+ *    state because File objects are not serializable.
+ */
+export const saveDraft = createAsyncThunk(
+  "property/saveDraft",
+  async (
+    { payload, files = [] }: { payload: DraftPayload; files?: File[] },
+    { rejectWithValue }
+  ) => {
+    try {
+      const res = await saveDraftApi(payload, files);
+      return res.data;
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.message ??
+        err?.response?.data?.error   ??
+        err?.message                 ??
+        "Failed to save draft";
+      return rejectWithValue(
+        Array.isArray(msg) ? msg.join("; ") : msg
+      );
+    }
   }
-});
+);
 
-// ✅ Get Boosts
-export const getActiveBoosts = createAsyncThunk<
-  any,
-  number,
-  { rejectValue: string }
->("property/boosts", async (propertyId, { rejectWithValue }) => {
-  try {
-    const { data } = await getActiveBoostsApi(propertyId);
-    return data;
-  } catch {
-    return rejectWithValue("Failed to fetch boosts");
+/**
+ * POST /properties
+ * Publish a listing. Consumes agent quota or owner wallet token.
+ *
+ * ⚠️ Same note as saveDraft — files never stored in Redux state.
+ */
+export const publishProperty = createAsyncThunk(
+  "property/publish",
+  async (
+    { payload, files = [] }: { payload: PropertyPayload; files?: File[] },
+    { rejectWithValue }
+  ) => {
+    try {
+      const res = await publishPropertyApi(payload, files);
+      return res.data;
+    } catch (err: any) {
+      // NestJS validation errors come as an array in message
+      const raw = err?.response?.data?.message;
+      const msg =
+        Array.isArray(raw)
+          ? raw.join("\n• ")
+          : raw ?? err?.response?.data?.error ?? err?.message ?? "Failed to publish";
+      return rejectWithValue(msg);
+    }
   }
-});
+);
 
-// ✅ Cancel Boost
-export const cancelBoost = createAsyncThunk<
-  number,
-  { propertyId: number; boostId: number },
-  { rejectValue: string }
->("property/cancelBoost", async (args, { rejectWithValue }) => {
-  try {
-    await cancelBoostApi(args.propertyId, args.boostId);
-    return args.boostId;
-  } catch {
-    return rejectWithValue("Cancel boost failed");
+/**
+ * DELETE /properties/:id
+ * Soft-delete a listing.
+ */
+export const deleteProperty = createAsyncThunk(
+  "property/delete",
+  async (id: number, { rejectWithValue }) => {
+    try {
+      const res = await deletePropertyApi(id);
+      return { id, ...res.data };
+    } catch (err: any) {
+      return rejectWithValue(
+        err?.response?.data?.message ?? err?.message ?? "Failed to delete"
+      );
+    }
   }
-});
+);
 
-// ✅ Wallet Balance
-export const getWalletBalance = createAsyncThunk<
-  any,
-  void,
-  { rejectValue: string }
->("property/walletBalance", async (_, { rejectWithValue }) => {
-  try {
-    const { data } = await getWalletBalanceApi();
-    return data;
-  } catch {
-    return rejectWithValue("Failed to fetch wallet balance");
+/**
+ * GET /properties/my
+ * Fetch authenticated user's own listings.
+ */
+export const fetchMyListings = createAsyncThunk(
+  "property/myListings",
+  async (status: string | undefined, { rejectWithValue }) => {
+    try {
+      const res = await getMyPropertiesApi(status);
+      return res.data;
+    } catch (err: any) {
+      return rejectWithValue(
+        err?.response?.data?.message ?? err?.message ?? "Failed to load listings"
+      );
+    }
   }
-});
+);
 
-// ✅ Wallet Transactions (FIXED TS1016)
-export const getWalletTransactions = createAsyncThunk<
-  any,
-  { page?: number; limit?: number } | undefined,
-  { rejectValue: string }
->("property/walletTransactions", async (params, { rejectWithValue }) => {
-  try {
-    const page = params?.page ?? 1;
-    const limit = params?.limit ?? 20;
-
-    const { data } = await getWalletTransactionsApi(page, limit);
-    return data;
-  } catch {
-    return rejectWithValue("Failed to fetch transactions");
+/**
+ * GET /properties
+ * Public browse with filters.
+ */
+export const browseProperties = createAsyncThunk(
+  "property/browse",
+  async (filters: BrowseFilters | undefined, { rejectWithValue }) => {
+    try {
+      const res = await browsePropertiesApi(filters);
+      return res.data;
+    } catch (err: any) {
+      return rejectWithValue(
+        err?.response?.data?.message ?? err?.message ?? "Failed to browse"
+      );
+    }
   }
-});
+);
 
-/* ─────────────────────────────────────────────
-   SLICE
-───────────────────────────────────────────── */
+// ─── SLICE ────────────────────────────────────────────────────────────────────
 
 const propertySlice = createSlice({
   name: "property",
   initialState,
   reducers: {
+    /** Call this on form unmount to prevent stale data leaking between sessions */
     clearSelectedProperty(state) {
       state.selectedProperty = null;
+      state.error = null;
     },
-    clearPropertyError(state) {
+    clearError(state) {
       state.error = null;
     },
   },
   extraReducers: (builder) => {
-    // ✅ 1. ALL addCase FIRST
-
-    builder.addCase(browseProperties.fulfilled, (state, action) => {
-      state.properties = action.payload?.data || action.payload;
-    });
-
-    builder.addCase(getProperty.fulfilled, (state, action) => {
-      state.selectedProperty = action.payload;
-    });
-
-    builder.addCase(getMyProperties.fulfilled, (state, action) => {
-      state.myProperties = action.payload;
-    });
-
-    builder.addCase(deleteProperty.fulfilled, (state, action) => {
-      state.myProperties = state.myProperties.filter(
-        (p: any) => p.id !== action.payload,
-      );
-    });
-
-    builder.addCase(getQuota.fulfilled, (state, action) => {
-      state.quota = action.payload;
-    });
-
-    builder.addCase(getActiveBoosts.fulfilled, (state, action) => {
-      state.boosts = action.payload;
-    });
-
-    builder.addCase(cancelBoost.fulfilled, (state, action) => {
-      state.boosts = state.boosts.filter((b: any) => b.id !== action.payload);
-    });
-
-    builder.addCase(getWalletBalance.fulfilled, (state, action) => {
-      state.walletBalance = action.payload;
-    });
-
-    builder.addCase(getWalletTransactions.fulfilled, (state, action) => {
-      state.walletTransactions = action.payload;
-    });
-
-    // ✅ 2. MATCHERS LAST (VERY IMPORTANT)
-
-    builder.addMatcher(
-      (action): action is any =>
-        action.type.startsWith("property/") && action.type.endsWith("/pending"),
-      (state: PropertyState) => {
+    // ── getProperty ──────────────────────────────────────────────────────────
+    builder
+      .addCase(getProperty.pending, (state) => {
         state.loading = true;
+        state.error   = null;
+      })
+      .addCase(getProperty.fulfilled, (state, action: PayloadAction<any>) => {
+        state.loading          = false;
+        // Store the raw property; form calls apiToForm() on the thunk result directly
+        state.selectedProperty = action.payload?.data ?? action.payload ?? null;
+      })
+      .addCase(getProperty.rejected, (state, action) => {
+        state.loading = false;
+        state.error   = action.payload as string;
+      });
+
+    // ── saveDraft ────────────────────────────────────────────────────────────
+    builder
+      .addCase(saveDraft.pending, (state) => {
         state.error = null;
-      },
-    );
+      })
+      .addCase(saveDraft.fulfilled, (state, action: PayloadAction<any>) => {
+        // Update selectedProperty if it's the same draft
+        const returned = action.payload?.data ?? action.payload;
+        if (returned?.id && state.selectedProperty?.id === returned.id) {
+          state.selectedProperty = returned;
+        }
+      })
+      .addCase(saveDraft.rejected, (state, action) => {
+        state.error = action.payload as string;
+      });
 
-    builder.addMatcher(
-      (action): action is any =>
-        action.type.startsWith("property/") &&
-        action.type.endsWith("/rejected"),
-      (state: PropertyState, action) => {
+    // ── publishProperty ──────────────────────────────────────────────────────
+    builder
+      .addCase(publishProperty.pending, (state) => {
+        state.loading = true;
+        state.error   = null;
+      })
+      .addCase(publishProperty.fulfilled, (state, action: PayloadAction<any>) => {
+        state.loading          = false;
+        state.selectedProperty = action.payload?.data ?? action.payload ?? null;
+      })
+      .addCase(publishProperty.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload || "Something went wrong";
-      },
-    );
+        state.error   = action.payload as string;
+      });
 
-    builder.addMatcher(
-      (action): action is any =>
-        action.type.startsWith("property/") &&
-        action.type.endsWith("/fulfilled"),
-      (state: PropertyState) => {
+    // ── deleteProperty ───────────────────────────────────────────────────────
+    builder
+      .addCase(deleteProperty.fulfilled, (state, action: PayloadAction<any>) => {
+        state.myListings = state.myListings.filter(p => p.id !== action.payload.id);
+      });
+
+    // ── fetchMyListings ──────────────────────────────────────────────────────
+    builder
+      .addCase(fetchMyListings.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(fetchMyListings.fulfilled, (state, action: PayloadAction<any>) => {
+        state.loading    = false;
+        state.myListings = action.payload?.data ?? action.payload ?? [];
+      })
+      .addCase(fetchMyListings.rejected, (state, action) => {
         state.loading = false;
-      },
-    );
+        state.error   = action.payload as string;
+      });
+
+    // ── browseProperties ─────────────────────────────────────────────────────
+    builder
+      .addCase(browseProperties.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(browseProperties.fulfilled, (state, action: PayloadAction<any>) => {
+        state.loading       = false;
+        state.browseResults = action.payload?.data ?? action.payload ?? [];
+      })
+      .addCase(browseProperties.rejected, (state, action) => {
+        state.loading = false;
+        state.error   = action.payload as string;
+      });
   },
 });
 
-export const { clearSelectedProperty, clearPropertyError } =
-  propertySlice.actions;
-
+export const { clearSelectedProperty, clearError } = propertySlice.actions;
 export default propertySlice.reducer;

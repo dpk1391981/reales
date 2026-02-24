@@ -1,59 +1,76 @@
-// src/api/propertyApi.ts
+// src/services/propertyApi.ts
 // ─────────────────────────────────────────────────────────────────────────────
 // All property-related API calls.
-// Mirrors the structure of authApi.ts — every function returns an axios promise.
-// Photos are sent as real File objects inside multipart/form-data.
-// Bearer token is attached automatically by axiosInstance interceptor.
+//
+// KEY RULES for the NestJS backend:
+//  1. Request must be multipart/form-data (for photo uploads).
+//  2. Do NOT manually set Content-Type — browser calculates the boundary.
+//  3. category_id, subcategory_id, locality_id → integers (sent as string in
+//     multipart, DTO @Transform(toInt) coerces them back).
+//  4. amenities → JSON string '[1,2,3]' — DTO @Transform(toIntArray) parses it.
+//  5. Booleans → "true" / "false" strings — DTO @Transform(toBool) parses them.
+//  6. Each photo File appended under field name "photos" (matches FilesInterceptor).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import axiosInstance from "@/lib/axiosConfig";
 
-// ─── TYPES ────────────────────────────────────────────────────────────────────
+// ─── PAYLOAD TYPES ────────────────────────────────────────────────────────────
+// These match the NestJS CreatePropertyDto exactly.
+// The form resolves string values to integer IDs before calling toPayload().
 
 export interface PropertyPayload {
-  propertyCategory: string;
-  listingType: string;
-  plan?: string;
-  residentialType?: string;
-  commercialType?: string;
-  industrialType?: string;
-  bhk?: string;
-  area?: string;
-  price?: string;
-  description?: string;
+  // ── Category (integer FKs — required for publish, optional for draft) ─────
+  category_id?:    number;
+  subcategory_id?: number;
+  config_type_id?: number;  // BHK / seat type / plot size type
 
-  // ── Location — numeric FK IDs, mirrors property.entity.ts ──────────────
-  // Sent as string form-data fields (multipart has no native number).
-  // Backend @Transform(({ value }) => Number(value)) parses them back.
-  country_id?: number;   // required for publish, optional on draft
+  // ── Listing type ──────────────────────────────────────────────────────────
+  listingType: string;      // "sell" | "rent" | "pg"
+  plan?:       string;      // "free" | "paid"
+
+  // ── Numerics ──────────────────────────────────────────────────────────────
+  area?:        number | string;
+  price?:       number | string;
+  deposit?:     number | string;
+  maintenance?: number | string;
+  bathrooms?:   number;
+  balconies?:   number;
+
+  // ── Location FK IDs ───────────────────────────────────────────────────────
+  country_id?: number;
   state_id?:   number;
   city_id?:    number;
-  locality:    any;   // free-text name, not an FK (stored as VARCHAR)
+  locality_id?: number;   // integer FK — required for publish
 
-  society?: string;
-  pincode?: string;
-  virtualTour?: boolean;
-  hideNumber?: boolean;
-  ownerName?: string;
-  ownerPhone?: string;
-  negotiable?: boolean;
-  urgent?: boolean;
-  loanAvailable?: boolean;
-  featured?: boolean;
-  bathrooms?: number;
-  balconies?: number;
-  furnishing?: string;
-  facing?: string;
-  age?: string;
-  amenities?: string[];
-  deposit?: string;
-  maintenance?: string;
+  // ── Text ──────────────────────────────────────────────────────────────────
+  description?: string;
+  society?:     string;
+  pincode?:     string;
   projectName?: string;
   builderName?: string;
-  rera?: string;
-  powerLoad?: string;
-  roadWidth?: string;
-  cabins?: string;
+  rera?:        string;
+  powerLoad?:   string;
+  roadWidth?:   string;
+  cabins?:      string;
+  furnishing?:  string;
+  facing?:      string;
+  age?:         string;
+
+  // ── Boolean flags ─────────────────────────────────────────────────────────
+  virtualTour?:   boolean;
+  hideNumber?:    boolean;
+  negotiable?:    boolean;
+  urgent?:        boolean;
+  loanAvailable?: boolean;
+  featured?:      boolean;
+
+  // ── Contact ───────────────────────────────────────────────────────────────
+  ownerName?:  string;
+  ownerPhone?: string;
+
+  // ── Amenities — integer FK array ──────────────────────────────────────────
+  // e.g. [1, 3, 7]. Sent as JSON string via multipart, parsed by DTO @Transform.
+  amenities?: number[];
 }
 
 export interface DraftPayload extends Partial<PropertyPayload> {
@@ -61,155 +78,161 @@ export interface DraftPayload extends Partial<PropertyPayload> {
 }
 
 export interface BrowseFilters {
-  city_id?:    number;   // filter by city FK
-  state_id?:   number;   // filter by state FK
-  country_id?: number;
-  category?: string;
-  listingType?: string;
-  bhk?: string;
-  minPrice?: number;
-  maxPrice?: number;
-  page?: number;
-  limit?: number;
+  city_id?:        number;
+  state_id?:       number;
+  country_id?:     number;
+  category_id?:    number;
+  config_type_id?: number;
+  listingType?:    string;
+  minPrice?:       number;
+  maxPrice?:       number;
+  page?:           number;
+  limit?:          number;
 }
 
 // ─── FORMDATA BUILDER ─────────────────────────────────────────────────────────
 /**
- * NestJS FilesInterceptor expects:
- *  - All scalar fields as form-data string fields
- *  - Booleans as "true" / "false" strings (multipart has no native bool)
- *  - amenities as a JSON string:  '["Lift","Parking"]'
- *  - Photo files appended under field name "photos"
- *  - NO Content-Type header — browser sets it with the correct multipart boundary
+ * Converts a PropertyPayload + File[] into multipart FormData for NestJS.
+ *
+ * Transformation rules (must match DTO @Transform decorators):
+ *   • Numbers    → String(n)           (DTO @Transform(toInt / toNum) parses)
+ *   • Booleans   → "true" / "false"    (DTO @Transform(toBool) parses)
+ *   • amenities  → '[1,2,3]' JSON str  (DTO @Transform(toIntArray) parses)
+ *   • Files      → appended as File    (FilesInterceptor('photos', 20))
+ *   • undefined / null / "" → skipped
+ *
+ * IMPORTANT: Do NOT set Content-Type header — let the browser add the boundary.
  */
-const toFormData = (payload: PropertyPayload | DraftPayload, files: File[]): FormData => {
+const toFormData = (
+  payload: PropertyPayload | DraftPayload,
+  files: File[],
+): FormData => {
   const fd = new FormData();
 
   for (const [key, value] of Object.entries(payload)) {
-    if (key === "amenities") continue;               // handled separately below
-    if (value === undefined || value === null) continue;
-    if (value === "") continue;
-    fd.append(key, typeof value === "boolean" ? String(value) : String(value));
+    // amenities and draftId handled separately
+    if (key === "amenities" || key === "draftId") continue;
+    if (value === undefined || value === null || value === "") continue;
+
+    if (typeof value === "boolean") {
+      fd.append(key, value ? "true" : "false");
+    } else {
+      // numbers, strings all become strings in multipart
+      fd.append(key, String(value));
+    }
   }
 
-  // amenities must arrive as a JSON string so NestJS @Transform can parse it
-  const amenities = (payload as PropertyPayload).amenities;
+  // draftId — append if present (used by PUT /properties/draft to update existing draft)
+  const draftId = (payload as DraftPayload).draftId;
+  if (draftId !== undefined) {
+    fd.append("draftId", String(draftId));
+  }
+
+  // amenities → JSON integer array string
+  // DTO backend: @Transform(toIntArray) parses '[1,2,3]' → [1,2,3]
+  const amenities = payload.amenities;
   if (amenities && amenities.length > 0) {
     fd.append("amenities", JSON.stringify(amenities));
   }
 
-  // Real File objects under field name "photos"
-  files.forEach((file) => fd.append("photos", file, file.name));
+  // Photos — each File appended under "photos" field
+  // FilesInterceptor('photos', 20) on the backend handles this.
+  // Using file.name as the filename hint for the server.
+  files.forEach((file) => {
+    fd.append("photos", file, file.name);
+  });
 
   return fd;
 };
 
-// ─── MULTIPART REQUEST CONFIG ─────────────────────────────────────────────────
-// Setting Content-Type to undefined lets the browser/axios calculate the
-// multipart boundary automatically. If you leave it as application/json the
-// boundary will be missing and the server will reject the request.
-const multipart = { headers: { "Content-Type": undefined as any } };
+// ─── Axios config — no manual Content-Type (browser sets multipart boundary) ──
+const multipartConfig = {
+  headers: {
+    // Explicitly delete Content-Type so axios doesn't set application/json,
+    // allowing the browser to compute the correct multipart/form-data boundary.
+    "Content-Type": undefined as unknown as string,
+  },
+};
 
-// ─── PROPERTY ENDPOINTS ──────────────────────────────────────────────────────
+// ─── ENDPOINTS ────────────────────────────────────────────────────────────────
 
 /**
  * POST /properties
- * Publish a full listing.
- * Agent  → consumes subscription quota
- * Owner  → consumes wallet token (every 20th post deducts 1 token)
+ * Publish a new listing. Consumes quota (agent) or wallet token (owner).
+ * Requires: category_id, subcategory_id, locality_id, listingType (validated by DTO).
  */
 export const publishPropertyApi = (payload: PropertyPayload, files: File[]) =>
-  axiosInstance.post("/properties", toFormData(payload, files), multipart);
+  axiosInstance.post(
+    "/properties",
+    toFormData(payload, files),
+    multipartConfig,
+  );
 
 /**
  * PUT /properties/draft
- * Auto-save or manual save a draft. Does NOT consume quota or tokens.
- * Omit draftId to create a new draft; include it to update an existing one.
+ * Save or update a draft. Does NOT consume quota or wallet tokens.
+ * All DTO fields are optional — backend uses skipMissingProperties: true.
+ * Pass draftId in payload to update an existing draft record.
  */
 export const saveDraftApi = (payload: DraftPayload, files: File[] = []) =>
-  axiosInstance.put("/properties/draft", toFormData(payload, files), multipart);
+  axiosInstance.put(
+    "/properties/draft",
+    toFormData(payload, files),
+    multipartConfig,
+  );
 
 /**
  * PUT /properties/:id
- * Update an existing published or draft listing.
+ * Update an existing listing by numeric ID.
  */
-export const updatePropertyApi = (id: number, payload: Partial<PropertyPayload>, files: File[] = []) =>
-  axiosInstance.put(`/properties/${id}`, toFormData(payload, files), multipart);
+export const updatePropertyApi = (
+  id: number,
+  payload: Partial<PropertyPayload>,
+  files: File[] = [],
+) =>
+  axiosInstance.put(
+    `/properties/${id}`,
+    toFormData(payload, files),
+    multipartConfig,
+  );
 
-/**
- * DELETE /properties/:id
- * Soft-delete a listing. Quota / tokens are NOT restored (prevents abuse).
- */
+/** DELETE /properties/:id — soft delete */
 export const deletePropertyApi = (id: number) =>
   axiosInstance.delete(`/properties/${id}`);
 
-/**
- * GET /properties
- * Public browse with optional filters.
- */
+/** GET /properties — public browse with optional filters */
 export const browsePropertiesApi = (filters?: BrowseFilters) =>
   axiosInstance.get("/properties", { params: filters });
 
-/**
- * GET /properties/:idOrSlug
- * Single listing by numeric id or SEO slug.
- * Backend also fires the view counter on this call.
- */
+/** GET /properties/:idOrSlug — single listing */
 export const getPropertyApi = (idOrSlug: string | number) =>
   axiosInstance.get(`/properties/${idOrSlug}`);
 
-/**
- * GET /properties/my?status=published|draft|rejected|expired
- * Authenticated user's own listings.
- */
+/** GET /properties/my?status=... — authenticated user's own listings */
 export const getMyPropertiesApi = (status?: string) =>
-  axiosInstance.get("/properties/my", { params: status ? { status } : undefined });
+  axiosInstance.get("/properties/my", {
+    params: status ? { status } : undefined,
+  });
 
-/**
- * GET /properties/quota
- * Agent: returns subscription quota info.
- * Owner: redirects to wallet — use getWalletBalanceApi() instead.
- */
+/** GET /properties/quota — agent subscription quota info */
 export const getPropertyQuotaApi = () =>
   axiosInstance.get("/properties/quota");
 
-// ─── BOOST ENDPOINTS ─────────────────────────────────────────────────────────
+// ─── BOOST ENDPOINTS ──────────────────────────────────────────────────────────
 
-/**
- * POST /properties/:propertyId/boosts
- * Buy a boost package for a listing.
- * Owner: deducts tokens from wallet.
- * Agent: included in plan perks (no token cost).
- */
 export const buyBoostApi = (propertyId: number, packageId: number) =>
   axiosInstance.post(`/properties/${propertyId}/boosts`, { package_id: packageId });
 
-/**
- * GET /properties/:propertyId/boosts
- * All currently active boosts for a property.
- */
 export const getActiveBoostsApi = (propertyId: number) =>
   axiosInstance.get(`/properties/${propertyId}/boosts`);
 
-/**
- * DELETE /properties/:propertyId/boosts/:boostId
- * Cancel an active boost. Owner boosts are fully refunded.
- */
 export const cancelBoostApi = (propertyId: number, boostId: number) =>
   axiosInstance.delete(`/properties/${propertyId}/boosts/${boostId}`);
 
-// ─── WALLET ENDPOINTS ─────────────────────────────────────────────────────────
+// ─── WALLET ENDPOINTS ──────────────────────────────────────────────────────────
 
-/**
- * GET /wallet/balance
- * Owner's token balance + posts_remaining calculation.
- */
 export const getWalletBalanceApi = () =>
   axiosInstance.get("/wallet/balance");
 
-/**
- * GET /wallet/transactions?page=1&limit=20
- * Full immutable token ledger with pagination.
- */
 export const getWalletTransactionsApi = (page = 1, limit = 20) =>
   axiosInstance.get("/wallet/transactions", { params: { page, limit } });

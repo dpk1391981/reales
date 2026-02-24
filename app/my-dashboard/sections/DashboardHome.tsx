@@ -1,84 +1,126 @@
 "use client";
 
 import { PanelData } from "../UserPanel";
+import {
+  coverUrl,
+  propertyTitle,
+  locationLabel,
+  fmtPrice,
+  fmtDate,
+  daysUntilExpiry,
+  statusStyle,
+} from "@/utils/propertyDisplay";
 
 interface Props {
-  data: PanelData;
+  data:       PanelData;
   onNavigate: (k: string) => void;
-  user: any;
+  user:       any;
 }
 
-const fmtPrice = (v: string | number) => {
-  const n = Number(v);
-  if (!n) return "—";
-  if (n >= 10000000) return `₹${(n / 10000000).toFixed(1)}Cr`;
-  if (n >= 100000)   return `₹${(n / 100000).toFixed(1)}L`;
-  return `₹${n.toLocaleString("en-IN")}`;
-};
-
-const statusColor: Record<string, string> = {
-  published: "bg-emerald-100 text-emerald-700",
-  draft:     "bg-amber-100 text-amber-700",
-  rejected:  "bg-red-100 text-red-600",
-  expired:   "bg-slate-100 text-slate-600",
-};
-
 export const DashboardHome = ({ data, onNavigate, user }: Props) => {
-  const totalViews   = data.published.reduce((s: number, p: any) => s + (p.views ?? 0), 0);
-  const totalLeads   = data.published.reduce((s: number, p: any) => s + (p.enquiries ?? p.leads ?? 0), 0);
-  const totalSaved   = data.published.reduce((s: number, p: any) => s + (p.saved_count ?? 0), 0);
-  const walletBal    = data.wallet?.balance ?? user?.balance ?? 0;
-  const allListings  = [...data.published, ...data.draft, ...data.rejected, ...data.expired];
-  const recent5      = allListings.slice(0, 5);
+  // ── Aggregate stats using real API field names ──────────────────────────
+  const totalViews  = data.published.reduce((s: number, p: any) => s + (p.views_count  ?? 0), 0);
+  const totalLeads  = data.published.reduce((s: number, p: any) => s + (p.leads_count  ?? 0), 0);
+  const totalSaves  = data.published.reduce((s: number, p: any) => s + (p.saves_count  ?? 0), 0);
+  const walletBal   = data.wallet?.balance ?? user?.balance ?? 0;
 
+  const allListings = [
+    ...data.published,
+    ...data.draft,
+    ...data.rejected,
+    ...data.expired,
+  ];
+  const recent5 = allListings.slice(0, 5);
+
+  // ── Stat cards ────────────────────────────────────────────────────────────
   const STATS = [
-    { label: "Active Listings",  value: data.loadingProps ? "—" : data.published.length, icon: "🏠", grad: "from-[#1D4ED8] to-[#2563EB]", sub: `${data.draft.length} drafts` },
-    { label: "Total Views",      value: data.loadingProps ? "—" : totalViews.toLocaleString(), icon: "👁️", grad: "from-violet-500 to-violet-600", sub: "all time" },
-    { label: "Enquiries",        value: data.loadingProps ? "—" : totalLeads, icon: "📞", grad: "from-emerald-500 to-emerald-600", sub: "received" },
-    { label: "Wallet",           value: data.loadingWallet ? "—" : `₹${walletBal.toLocaleString("en-IN")}`, icon: "💳", grad: "from-amber-500 to-orange-500", sub: "balance" },
+    {
+      label: "Active Listings",
+      value: data.loadingProps ? "—" : data.published.length,
+      icon:  "🏠",
+      grad:  "from-[#1D4ED8] to-[#2563EB]",
+      sub:   `${data.draft.length} draft${data.draft.length !== 1 ? "s" : ""}`,
+    },
+    {
+      label: "Total Views",
+      value: data.loadingProps ? "—" : totalViews.toLocaleString("en-IN"),
+      icon:  "👁️",
+      grad:  "from-violet-500 to-violet-600",
+      sub:   "all time",
+    },
+    {
+      label: "Enquiries",
+      value: data.loadingProps ? "—" : totalLeads,
+      icon:  "📞",
+      grad:  "from-emerald-500 to-emerald-600",
+      sub:   "received",
+    },
+    {
+      label: "Wallet",
+      value: data.loadingWallet ? "—" : `₹${Number(walletBal).toLocaleString("en-IN")}`,
+      icon:  "💳",
+      grad:  "from-amber-500 to-orange-500",
+      sub:   "balance",
+    },
   ];
 
+  // ── Quick action buttons ──────────────────────────────────────────────────
   const QUICK = [
-    { label: "Post Property",    icon: "➕", action: () => { window.location.href = "/post-property"; },  style: "bg-gradient-to-br from-[#1D4ED8] to-[#2563EB] text-white shadow-[0_4px_20px_rgba(37,99,235,0.35)]" },
-    { label: "My Listings",      icon: "🏠", action: () => onNavigate("listings"),  style: "bg-white border-2 border-blue-100 text-[#0B3C8C] hover:border-blue-300" },
-    { label: "Drafts",           icon: "📝", action: () => onNavigate("drafts"),    style: "bg-white border-2 border-blue-100 text-[#0B3C8C] hover:border-blue-300" },
-    { label: "Payments",         icon: "💳", action: () => onNavigate("payments"),  style: "bg-white border-2 border-blue-100 text-[#0B3C8C] hover:border-blue-300" },
-    { label: "Saved",            icon: "❤️", action: () => onNavigate("saved"),     style: "bg-white border-2 border-blue-100 text-[#0B3C8C] hover:border-blue-300" },
-    { label: "Profile",          icon: "👤", action: () => onNavigate("profile"),   style: "bg-white border-2 border-blue-100 text-[#0B3C8C] hover:border-blue-300" },
+    {
+      label:  "Post Property",
+      icon:   "➕",
+      action: () => { window.location.href = "/post-property"; },
+      style:  "bg-gradient-to-br from-[#1D4ED8] to-[#2563EB] text-white shadow-[0_4px_20px_rgba(37,99,235,0.35)]",
+    },
+    { label: "My Listings", icon: "🏠", action: () => onNavigate("listings"),  style: "bg-white border-2 border-blue-100 text-[#0B3C8C] hover:border-blue-300" },
+    { label: "Drafts",      icon: "📝", action: () => onNavigate("drafts"),    style: "bg-white border-2 border-blue-100 text-[#0B3C8C] hover:border-blue-300" },
+    { label: "Payments",    icon: "💳", action: () => onNavigate("payments"),  style: "bg-white border-2 border-blue-100 text-[#0B3C8C] hover:border-blue-300" },
+    { label: "Saved",       icon: "❤️", action: () => onNavigate("saved"),     style: "bg-white border-2 border-blue-100 text-[#0B3C8C] hover:border-blue-300" },
+    { label: "Profile",     icon: "👤", action: () => onNavigate("profile"),   style: "bg-white border-2 border-blue-100 text-[#0B3C8C] hover:border-blue-300" },
   ];
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
 
-      {/* Welcome banner */}
+      {/* ── Welcome banner ─────────────────────────────────────────────────── */}
       <div className="fade-up bg-gradient-to-r from-[#0B3C8C] via-[#1E40AF] to-[#3B82F6] rounded-2xl p-5 text-white flex items-center justify-between overflow-hidden relative">
+        {/* Decorative blobs */}
         <div className="absolute inset-0 opacity-10 pointer-events-none">
           <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full bg-white" />
           <div className="absolute -bottom-6 -left-4 w-28 h-28 rounded-full bg-white" />
         </div>
         <div className="relative z-10">
-          <p className="text-blue-200 text-[10px] font-black tracking-[0.2em] uppercase mb-1">Welcome back 👋</p>
-          <h2 className="pf text-xl font-bold">{user?.username || user?.phone || "Property Owner"}</h2>
+          <p className="text-blue-200 text-[10px] font-black tracking-[0.2em] uppercase mb-1">
+            Welcome back 👋
+          </p>
+          <h2 className="pf text-xl font-bold">
+            {user?.name || user?.username || user?.phone || "Property Owner"}
+          </h2>
           <p className="text-blue-200 text-xs mt-1">
-            {data.published.length} active · {data.draft.length} drafts · {data.rejected.length} need attention
+            {data.published.length} active · {data.draft.length} draft{data.draft.length !== 1 ? "s" : ""} · {data.rejected.length} need attention
           </p>
         </div>
         <div className="relative z-10 text-right hidden sm:block">
-          <p className="text-blue-200 text-[10px] font-semibold">OTP Status</p>
-          <p className={`text-xs font-black mt-0.5 ${user?.is_otp_verified ? "text-emerald-300" : "text-red-300"}`}>
-            {user?.is_otp_verified ? "✅ Verified" : "❌ Unverified"}
+          <p className="text-blue-200 text-[10px] font-semibold">Phone</p>
+          <p className="text-white text-[11px] font-bold mt-0.5">
+            {user?.phone ?? "—"}
           </p>
           <p className="text-blue-200 text-[10px] mt-1.5 font-semibold">Member since</p>
           <p className="text-white text-[11px] font-bold">
-            {user?.date_created ? new Date(user.date_created).toLocaleDateString("en-IN", { month: "short", year: "numeric" }) : "—"}
+            {user?.created_at
+              ? new Date(user.created_at).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
+              : user?.date_created
+              ? new Date(user.date_created).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
+              : "—"}
           </p>
         </div>
       </div>
 
-      {/* Stats */}
+      {/* ── Stats ──────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {STATS.map((s, i) => (
-          <div key={i} className={`fade-up-${i + 1} bg-white rounded-2xl border border-blue-50 p-4 shadow-[0_2px_12px_rgba(11,60,140,0.05)] hover:shadow-[0_4px_20px_rgba(11,60,140,0.1)] transition-all`}>
+          <div key={i}
+            className="fade-up bg-white rounded-2xl border border-blue-50 p-4 shadow-[0_2px_12px_rgba(11,60,140,0.05)] hover:shadow-[0_4px_20px_rgba(11,60,140,0.1)] transition-all">
             <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${s.grad} flex items-center justify-center text-sm mb-3`}>
               {s.icon}
             </div>
@@ -91,14 +133,16 @@ export const DashboardHome = ({ data, onNavigate, user }: Props) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
 
-        {/* Quick actions */}
+        {/* ── Quick actions + alerts ────────────────────────────────────────── */}
         <div className="lg:col-span-2">
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Quick Actions</p>
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
+            Quick Actions
+          </p>
           <div className="grid grid-cols-3 gap-2">
             {QUICK.map((q, i) => (
               <button key={i} onClick={q.action}
                 className={`flex flex-col items-center gap-1.5 p-3 rounded-2xl text-center text-[10px] font-bold transition-all cursor-pointer border-none font-[inherit] active:scale-95 ${q.style}`}
-                style={{WebkitTapHighlightColor:"transparent"}}>
+                style={{ WebkitTapHighlightColor: "transparent" }}>
                 <span className="text-xl">{q.icon}</span>
                 <span className="leading-tight">{q.label}</span>
               </button>
@@ -112,7 +156,9 @@ export const DashboardHome = ({ data, onNavigate, user }: Props) => {
                 <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2.5">
                   <span className="text-lg flex-shrink-0">⚠️</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-black text-red-700">{data.rejected.length} Listing{data.rejected.length > 1 ? "s" : ""} Rejected</p>
+                    <p className="text-[11px] font-black text-red-700">
+                      {data.rejected.length} Listing{data.rejected.length > 1 ? "s" : ""} Rejected
+                    </p>
                     <p className="text-[10px] text-red-500 mt-0.5">Review and resubmit</p>
                   </div>
                   <button onClick={() => onNavigate("listings")}
@@ -125,7 +171,9 @@ export const DashboardHome = ({ data, onNavigate, user }: Props) => {
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center gap-2.5">
                   <span className="text-lg flex-shrink-0">⏰</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-black text-amber-700">{data.expired.length} Listing{data.expired.length > 1 ? "s" : ""} Expired</p>
+                    <p className="text-[11px] font-black text-amber-700">
+                      {data.expired.length} Listing{data.expired.length > 1 ? "s" : ""} Expired
+                    </p>
                     <p className="text-[10px] text-amber-500 mt-0.5">Renew to stay visible</p>
                   </div>
                   <button onClick={() => onNavigate("payments")}
@@ -138,18 +186,21 @@ export const DashboardHome = ({ data, onNavigate, user }: Props) => {
           )}
         </div>
 
-        {/* Recent listings */}
+        {/* ── Recent listings ───────────────────────────────────────────────── */}
         <div className="lg:col-span-3">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Recent Listings</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+              Recent Listings
+            </p>
             <button onClick={() => onNavigate("listings")}
               className="text-[10px] font-black text-blue-600 border-none cursor-pointer bg-transparent hover:text-blue-800">
               View All →
             </button>
           </div>
+
           {data.loadingProps ? (
             <div className="space-y-2">
-              {[1,2,3].map(i => (
+              {[1, 2, 3].map((i) => (
                 <div key={i} className="bg-white rounded-xl p-3 border border-blue-50 animate-pulse h-16" />
               ))}
             </div>
@@ -165,28 +216,7 @@ export const DashboardHome = ({ data, onNavigate, user }: Props) => {
           ) : (
             <div className="space-y-2">
               {recent5.map((p: any, i: number) => (
-                <div key={p.id ?? i} className="bg-white rounded-xl border border-blue-50 p-3 flex items-center gap-3 hover:border-blue-200 hover:shadow-sm transition-all">
-                  <div className="w-10 h-10 rounded-lg bg-blue-100 flex-shrink-0 overflow-hidden">
-                    {p.photos?.[0]
-                      ? <img src={p.photos[0]} alt="" className="w-full h-full object-cover" />
-                      : <div className="w-full h-full flex items-center justify-center text-lg">🏠</div>
-                    }
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-bold text-[#0B3C8C] truncate">
-                      {p.bhk ? `${p.bhk} ` : ""}{p.residentialType || p.commercialType || p.propertyCategory || "Property"}
-                    </p>
-                    <p className="text-[10px] text-slate-400 truncate">
-                      {p.locality ? `${p.locality}, ` : ""}{p.city || ""}
-                    </p>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-[11px] font-black text-[#0B3C8C]">{fmtPrice(p.price)}</p>
-                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${statusColor[p.status] ?? "bg-slate-100 text-slate-500"}`}>
-                      {(p.status ?? "unknown").toUpperCase()}
-                    </span>
-                  </div>
-                </div>
+                <RecentListingRow key={p.id ?? i} p={p} onNavigate={onNavigate} />
               ))}
             </div>
           )}
@@ -195,3 +225,81 @@ export const DashboardHome = ({ data, onNavigate, user }: Props) => {
     </div>
   );
 };
+
+// ─── RECENT LISTING ROW ───────────────────────────────────────────────────────
+// Separate component so it stays clean and re-usable.
+
+function RecentListingRow({
+  p,
+  onNavigate,
+}: {
+  p:          any;
+  onNavigate: (k: string) => void;
+}) {
+  const thumb    = coverUrl(p);                    // full absolute URL or undefined
+  const title    = propertyTitle(p);               // resolves integer IDs → labels
+  const location = locationLabel(p);               // locality / society / pincode
+  const price    = fmtPrice(p.price);
+  const ss       = statusStyle(p.status);
+
+  // Expiry warning
+  const days    = daysUntilExpiry(p.expires_at);
+  const expiring = days !== null && days <= 7 && days >= 0 && p.status === "published";
+
+  return (
+    <div
+      onClick={() => {
+        if (p.status === "draft") {
+          window.location.href = `/post-property?draft=${p.id}`;
+        } else {
+          window.location.href = `/post-property?edit=${p.id}`;
+        }
+      }}
+      className="bg-white rounded-xl border border-blue-50 p-3 flex items-center gap-3 hover:border-blue-200 hover:shadow-sm transition-all cursor-pointer"
+    >
+      {/* Thumbnail */}
+      <div className="w-12 h-12 rounded-xl bg-blue-50 flex-shrink-0 overflow-hidden border border-blue-100">
+        {thumb ? (
+          <img
+            src={thumb}
+            alt={title}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              // If image fails to load (wrong URL etc.) show placeholder
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-xl">🏠</div>
+        )}
+      </div>
+
+      {/* Details */}
+      <div className="flex-1 min-w-0">
+        <p className="text-[11px] font-bold text-[#0B3C8C] truncate">{title}</p>
+        <p className="text-[10px] text-slate-400 truncate mt-0.5">{location}</p>
+        {expiring && (
+          <p className="text-[9px] font-black text-amber-600 mt-0.5">
+            ⏰ Expires in {days} day{days !== 1 ? "s" : ""}
+          </p>
+        )}
+      </div>
+
+      {/* Price + status */}
+      <div className="text-right flex-shrink-0">
+        <p className="text-[11px] font-black text-[#0B3C8C]">{price}</p>
+        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full inline-block mt-0.5 ${ss.bg} ${ss.text}`}>
+          {ss.label.toUpperCase()}
+        </span>
+        {/* View / lead counts */}
+        {(p.views_count > 0 || p.leads_count > 0) && (
+          <p className="text-[9px] text-slate-400 mt-0.5">
+            {p.views_count > 0 && `👁 ${p.views_count}`}
+            {p.views_count > 0 && p.leads_count > 0 && " · "}
+            {p.leads_count > 0 && `📞 ${p.leads_count}`}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
