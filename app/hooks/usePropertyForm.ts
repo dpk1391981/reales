@@ -59,7 +59,7 @@ export interface FormData {
   furnishing:    string;
   facing:        string;
   age:           string;
-  amenities:     string[];
+  amenities:     any;
   deposit:       string;
   maintenance:   string;
   projectName:   string;
@@ -135,7 +135,7 @@ const persistLocally = (d: FormData) => {
   } catch { /* quota / private browsing */ }
 };
 
-const toPayload = (d: FormData): PropertyPayload => ({
+const toPayload = (d: FormData): any => ({
   propertyCategory: d.propertyCategory,
   listingType:      d.listingType,
   plan:             d.selectedPlan || d.plan || undefined,
