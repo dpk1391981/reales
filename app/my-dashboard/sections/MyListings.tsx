@@ -336,13 +336,48 @@ function ListingCard({
 
           {/* Action buttons */}
           <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
-            {/* Edit — draft goes to ?draft=id, others to ?edit=id */}
-            <a
-              href={p.status === "draft" ? `/post-property?draft=${p.id}` : `/post-property?edit=${p.id}`}
-              className="text-[10px] font-black text-[#1D4ED8] bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-lg no-underline hover:bg-blue-100 transition-colors"
-            >
-              {p.status === "draft" ? "✏️ Continue" : "👁 View"}
-            </a>
+
+            {/* ── draft: single "Continue editing" button ── */}
+            {p.status === "draft" && (
+              <a
+                href={`/post-property?draft=${p.id}`}
+                className="text-[10px] font-black text-[#1D4ED8] bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-lg no-underline hover:bg-blue-100 transition-colors"
+              >
+                ✏️ Continue
+              </a>
+            )}
+
+            {/* ── published: "View" (public page) + "Edit" (form) ── */}
+            {p.status === "published" && (
+              <>
+                {/* View — opens the public property page using SEO slug */}
+                <a
+                  href={p.slug ? `/property/${p.slug}` : `/property/${p.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-lg no-underline hover:bg-emerald-100 transition-colors"
+                >
+                  👁 View
+                </a>
+                {/* Edit — opens the post-property form pre-filled */}
+                <a
+                  href={`/post-property?edit=${p.id}`}
+                  className="text-[10px] font-black text-[#1D4ED8] bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-lg no-underline hover:bg-blue-100 transition-colors"
+                >
+                  ✏️ Edit
+                </a>
+              </>
+            )}
+
+            {/* ── rejected / expired: "Edit & Resubmit" ── */}
+            {(p.status === "rejected" || p.status === "expired") && (
+              <a
+                href={`/post-property?edit=${p.id}`}
+                className="text-[10px] font-black text-amber-700 bg-amber-50 border border-amber-100 px-2.5 py-1 rounded-lg no-underline hover:bg-amber-100 transition-colors"
+              >
+                ✏️ Edit &amp; Resubmit
+              </a>
+            )}
 
             {/* Boost — only for published */}
             {p.status === "published" && (
