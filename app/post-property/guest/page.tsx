@@ -5,92 +5,35 @@
  * ─────────────────────────────────────────────────
  * SEO:     Semantic HTML5, structured headings, alt text, canonical meta suggested
  * Mobile:  font-size:16px on all inputs (prevent iOS zoom), pb-safe, tap targets ≥48px
- * UX:      3-step funnel (Details → OTP → Success), OTP boxes w/ auto-advance,
- *          countdown timer, inline validation, animated stats, testimonial carousel
+ * UX:      3-step funnel (Details → OTP → Dashboard), 6-box OTP w/ auto-advance,
+ *          auto-verify on 6th digit, countdown timer, inline validation
  *
- * API Integration:
- *   sendOtp()   → POST /api/v1/auth/send-otp    { phone }
- *   verifyOtp() → POST /api/v1/auth/verify-otp  { phone, otp, intent, propertyType, city, name }
+ * API Integration (real — no inline fetch wrapper):
+ *   sendOtp()   → sendOtpApi({ phone })         from @/services/authApi
+ *   verifyOtp() → verifyOtpApi({ phone, otp })  from @/services/authApi
+ *
+ * Auth:
+ *   Stores access_token + refresh_token in localStorage
+ *   Dispatches setUser(user) to Redux authSlice
+ *   Redirects to /my-dashboard on success
  *
  * Theme: Blue gradient system (#0B3C8C → #1E40AF → #2563EB → #3B82F6)
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
-
-// ─── TYPES ────────────────────────────────────────────────────────────────────
-
-interface ApiError {
-  message: string;
-  code?: string;
-}
-
-interface SendOtpResponse {
-  success: boolean;
-  message: string;
-  expiresIn?: number; // seconds
-}
-
-interface VerifyOtpResponse {
-  success: boolean;
-  message: string;
-  token?: string;
-  user?: {
-    id: number;
-    phone: string;
-    name: string;
-    role: string;
-    isNewUser: boolean;
-  };
-  draftId?: string;
-}
-
-// ─── API LAYER ────────────────────────────────────────────────────────────────
-
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
-
-async function apiFetch<T>(
-  endpoint: string,
-  body: Record<string, unknown>,
-): Promise<T> {
-  const res = await fetch(`${BASE_URL}${endpoint}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  const data = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    const err = data as ApiError;
-    throw new Error(err.message ?? `Request failed (${res.status})`);
-  }
-
-  return data as T;
-}
-
-async function apiSendOtp(phone: string): Promise<SendOtpResponse> {
-  return apiFetch<SendOtpResponse>("/auth/send-otp", { phone });
-}
-
-async function apiVerifyOtp(payload: {
-  phone: string;
-  otp: string;
-  intent: string;
-  propertyType: string;
-  city: string;
-  name: string;
-}): Promise<VerifyOtpResponse> {
-  return apiFetch<VerifyOtpResponse>("/auth/verify-otp", payload);
-}
+import { useRouter }       from "next/navigation";
+import { sendOtpApi }      from "@/services/authApi";
+import { verifyOtpApi }    from "@/services/authApi";
+import { useAppDispatch }  from "@/store/hooks";
+import { setUser }         from "@/store/slices/authSlice";
 
 // ─── DATA ─────────────────────────────────────────────────────────────────────
 
 const PROPERTY_TYPES = [
-  { v: "residential", l: "Residential",  icon: "🏠", desc: "Flat, Villa, House" },
-  { v: "commercial",  l: "Commercial",   icon: "🏢", desc: "Office, Shop" },
-  { v: "plot",        l: "Plot / Land",  icon: "📐", desc: "Residential, Farm" },
-  { v: "pg",          l: "PG / Co-living", icon: "🛏️", desc: "Boys, Girls, Co-ed" },
+  { v: "residential", l: "Residential",    icon: "🏠", desc: "Flat, Villa, House"     },
+  { v: "commercial",  l: "Commercial",     icon: "🏢", desc: "Office, Shop"           },
+  { v: "plot",        l: "Plot / Land",    icon: "📐", desc: "Residential, Farm"      },
+  { v: "pg",          l: "PG / Co-living", icon: "🛏️", desc: "Boys, Girls, Co-ed"    },
 ];
 
 const CITIES = [
@@ -100,23 +43,23 @@ const CITIES = [
 
 const STATS = [
   { value: 24,  suffix: "L+", label: "Monthly Visitors" },
-  { value: 50,  suffix: "K+", label: "Verified Buyers" },
-  { value: 10,  suffix: "K+", label: "Deals Closed" },
-  { value: 500, suffix: "+",  label: "Cities Covered" },
+  { value: 50,  suffix: "K+", label: "Verified Buyers"  },
+  { value: 10,  suffix: "K+", label: "Deals Closed"     },
+  { value: 500, suffix: "+",  label: "Cities Covered"   },
 ];
 
 const FEATURES = [
-  { icon: "⚡", heading: "Live in 2 Minutes",   body: "Fill the form, verify OTP — your listing goes live instantly." },
-  { icon: "🔒", heading: "Hide Your Number",    body: "Stay private until you're ready. Only OTP-verified buyers reach you." },
-  { icon: "📊", heading: "Real-time Dashboard", body: "Track views, saves & enquiries from one smart dashboard." },
-  { icon: "🏆", heading: "RERA Verified Badge", body: "Get a trust badge that makes buyers 3× more likely to contact you." },
+  { icon: "⚡", heading: "Live in 2 Minutes",   body: "Fill the form, verify OTP — your listing goes live instantly."              },
+  { icon: "🔒", heading: "Hide Your Number",    body: "Stay private until you're ready. Only OTP-verified buyers reach you."      },
+  { icon: "📊", heading: "Real-time Dashboard", body: "Track views, saves & enquiries from one smart dashboard."                  },
+  { icon: "🏆", heading: "RERA Verified Badge", body: "Get a trust badge that makes buyers 3× more likely to contact you."       },
 ];
 
 const TESTIMONIALS = [
-  { name: "Amit Sharma",   role: "Property Owner", city: "Delhi",     avatar: "A", stars: 5, quote: "Listed my flat in 2 minutes and got 12 enquiries the same day. Unbelievably fast!" },
-  { name: "Priya Mehta",   role: "Agent",          city: "Mumbai",    avatar: "P", stars: 5, quote: "Best portal for independent agents. Verification is smooth and leads are genuine." },
-  { name: "Rohit Verma",   role: "Builder",        city: "Bangalore", avatar: "R", stars: 5, quote: "Sold 3 units from a single paid listing. The ROI is incredible compared to other portals." },
-  { name: "Sunita Kapoor", role: "Property Owner", city: "Gurgaon",   avatar: "S", stars: 5, quote: "Got a tenant in 4 days! Would never go back to newspaper ads or other apps." },
+  { name: "Amit Sharma",   role: "Property Owner", city: "Delhi",     avatar: "A", stars: 5, quote: "Listed my flat in 2 minutes and got 12 enquiries the same day. Unbelievably fast!"  },
+  { name: "Priya Mehta",   role: "Agent",          city: "Mumbai",    avatar: "P", stars: 5, quote: "Best portal for independent agents. Verification is smooth and leads are genuine."  },
+  { name: "Rohit Verma",   role: "Builder",        city: "Bangalore", avatar: "R", stars: 5, quote: "Sold 3 units from a single paid listing. The ROI is incredible compared to others." },
+  { name: "Sunita Kapoor", role: "Property Owner", city: "Gurgaon",   avatar: "S", stars: 5, quote: "Got a tenant in 4 days! Would never go back to newspaper ads or other apps."        },
 ];
 
 // ─── TINY ICONS ───────────────────────────────────────────────────────────────
@@ -163,9 +106,9 @@ const IC = {
 // ─── ANIMATED COUNTER ─────────────────────────────────────────────────────────
 
 function AnimCounter({ target, suffix }: { target: number; suffix: string }) {
-  const [val, setVal] = useState(0);
-  const ref = useRef<HTMLElement>(null);
-  const started = useRef(false);
+  const [val, setVal]   = useState(0);
+  const ref             = useRef<HTMLElement>(null);
+  const started         = useRef(false);
 
   useEffect(() => {
     if (!ref.current) return;
@@ -188,61 +131,76 @@ function AnimCounter({ target, suffix }: { target: number; suffix: string }) {
   return <em ref={ref} style={{ fontStyle: "normal" }}>{val}{suffix}</em>;
 }
 
-// ─── OTP INPUT BOXES ──────────────────────────────────────────────────────────
+// ─── 6-BOX OTP INPUT ─────────────────────────────────────────────────────────
+// 6 digits, auto-advance, backspace-back, arrow keys, paste, disabled state
 
-function OtpInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const boxes = [
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-    useRef<HTMLInputElement>(null),
-  ];
-  const digits = (value + "    ").slice(0, 4).split("");
+function OtpInput({
+  value, onChange, disabled,
+}: {
+  value: string; onChange: (v: string) => void; disabled?: boolean;
+}) {
+  const refs   = useRef<(HTMLInputElement | null)[]>([]);
+  const digits = (value + "      ").slice(0, 6).split("");
 
-  const handleInput = (i: number, raw: string) => {
-    const d = raw.replace(/\D/, "").slice(-1);
-    const arr = (value + "    ").slice(0, 4).split("");
-    arr[i] = d;
-    const next = arr.join("").replace(/ /g, "");
-    onChange(next);
-    if (d && i < 3) setTimeout(() => boxes[i + 1].current?.focus(), 10);
+  const handleChange = (i: number, raw: string) => {
+    const ch  = raw.replace(/\D/g, "").slice(-1);
+    const arr = (value + "      ").slice(0, 6).split("");
+    arr[i]    = ch;
+    onChange(arr.join("").trimEnd());
+    if (ch && i < 5) setTimeout(() => refs.current[i + 1]?.focus(), 0);
   };
 
-  const handleKey = (i: number, e: React.KeyboardEvent) => {
-    if (e.key === "Backspace" && !digits[i]?.trim() && i > 0)
-      boxes[i - 1].current?.focus();
+  const handleKey = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace") {
+      const arr = (value + "      ").slice(0, 6).split("");
+      arr[i]    = "";
+      onChange(arr.join("").trimEnd());
+      if (i > 0) setTimeout(() => refs.current[i - 1]?.focus(), 0);
+    }
+    if (e.key === "ArrowLeft"  && i > 0) refs.current[i - 1]?.focus();
+    if (e.key === "ArrowRight" && i < 5) refs.current[i + 1]?.focus();
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
-    const p = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 4);
+    const p = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
     onChange(p);
-    boxes[Math.min(p.length, 3)].current?.focus();
+    refs.current[Math.min(p.length, 5)]?.focus();
   };
 
   return (
-    <div className="flex gap-3 justify-center my-5" role="group" aria-label="OTP input">
-      {digits.map((d, i) => (
-        <input
-          key={i}
-          ref={boxes[i]}
-          type="text"
-          inputMode="numeric"
-          maxLength={1}
-          value={d.trim()}
-          aria-label={`OTP digit ${i + 1}`}
-          onPaste={handlePaste}
-          onChange={(e) => handleInput(i, e.target.value)}
-          onKeyDown={(e) => handleKey(i, e)}
-          className={`w-14 h-16 text-center font-black border-2 rounded-2xl outline-none transition-all duration-200
-            ${d.trim()
-              ? "border-[#2563EB] bg-gradient-to-b from-blue-50 to-white text-[#1E40AF] shadow-[0_4px_16px_rgba(37,99,235,0.2)]"
-              : "border-slate-200 bg-slate-50 text-slate-300"
-            }
-            focus:border-[#2563EB] focus:ring-4 focus:ring-blue-100 focus:bg-white`}
-          style={{ fontSize: "24px", WebkitTapHighlightColor: "transparent" }}
-        />
-      ))}
+    <div className="flex gap-2 justify-between my-5" role="group" aria-label="6-digit OTP">
+      {digits.map((d, i) => {
+        const filled = d.trim().length > 0;
+        return (
+          <input
+            key={i}
+            ref={(el) => { refs.current[i] = el; }}
+            type="tel"
+            inputMode="numeric"
+            maxLength={1}
+            value={filled ? d : ""}
+            disabled={disabled}
+            aria-label={`OTP digit ${i + 1}`}
+            onChange={(e) => handleChange(i, e.target.value)}
+            onKeyDown={(e) => handleKey(i, e)}
+            onPaste={i === 0 ? handlePaste : undefined}
+            className={`
+              h-14 text-center font-black rounded-2xl border-2 outline-none
+              transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed
+              ${filled
+                ? "border-[#2563EB] bg-gradient-to-b from-blue-50 to-white text-[#1E40AF] shadow-[0_4px_16px_rgba(37,99,235,.22)]"
+                : "border-slate-200 bg-slate-50 text-slate-300 focus:border-[#2563EB] focus:bg-white focus:ring-4 focus:ring-blue-100"
+              }
+            `}
+            style={{
+              width: "calc(16.6% - 7px)",
+              fontSize: "22px",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -250,23 +208,24 @@ function OtpInput({ value, onChange }: { value: string; onChange: (v: string) =>
 // ─── MAIN EXPORT ──────────────────────────────────────────────────────────────
 
 export default function Think4BuySaleLanding() {
-  const router = useRouter();
+  const router   = useRouter();
+  const dispatch = useAppDispatch();
 
   const [form, setForm] = useState({
-    intent: "sell",
+    intent:       "sell",
     propertyType: "residential",
-    city: "",
-    name: "",
-    phone: "",
-    otp: "",
+    city:         "",
+    name:         "",
+    phone:        "",
+    otp:          "",
   });
-  const [step, setStep] = useState<"form" | "otp" | "success">("form");
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [apiError, setApiError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [timer, setTimer] = useState(0);
+  const [step,      setStep]      = useState<"form" | "otp" | "success">("form");
+  const [errors,    setErrors]    = useState<Record<string, string>>({});
+  const [apiError,  setApiError]  = useState("");
+  const [loading,   setLoading]   = useState(false);
+  const [timer,     setTimer]     = useState(0);
   const [otpExpiry, setOtpExpiry] = useState(30);
-  const [testIdx, setTestIdx] = useState(0);
+  const [testIdx,   setTestIdx]   = useState(0);
 
   const upd = useCallback((k: string, v: string) => {
     setForm((p) => ({ ...p, [k]: v }));
@@ -287,62 +246,60 @@ export default function Think4BuySaleLanding() {
     return () => clearTimeout(t);
   }, [timer]);
 
+  // Auto-verify when all 6 digits entered
+  useEffect(() => {
+    if (step === "otp" && form.otp.length === 6 && !loading) verifyOtp();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.otp]);
+
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!form.city) e.city = "Please select your city";
-    if (!form.name || form.name.trim().length < 3) e.name = "Enter your full name (min 3 chars)";
-    if (!/^[6-9]\d{9}$/.test(form.phone)) e.phone = "Enter a valid 10-digit mobile number";
+    if (!form.city)                                 e.city  = "Please select your city";
+    if (!form.name || form.name.trim().length < 3)  e.name  = "Enter your full name (min 3 chars)";
+    if (!/^[6-9]\d{9}$/.test(form.phone))           e.phone = "Enter a valid 10-digit mobile number";
     setErrors(e);
     return !Object.keys(e).length;
   };
 
-  // ── API CALL 1: POST /api/v1/auth/send-otp ────────────────────────────────
+  // ── SEND OTP via real API ──────────────────────────────────────────────────
   const sendOtp = async () => {
     if (!validate()) return;
-    setLoading(true);
-    setApiError("");
+    setLoading(true); setApiError("");
     try {
-      const res = await apiSendOtp(form.phone);
-      if (res.success) {
-        const expiry = res.expiresIn ?? 30;
-        setOtpExpiry(expiry);
-        setTimer(expiry);
-        setStep("otp");
-      } else {
-        setApiError(res.message ?? "Failed to send OTP. Please try again.");
-      }
-    } catch (err: unknown) {
-      setApiError(err instanceof Error ? err.message : "Network error. Please check your connection.");
+      const { data } = await sendOtpApi({ phone: form.phone });
+      const expiry   = data?.expiresIn ?? data?.data?.expiresIn ?? 30;
+      setOtpExpiry(expiry);
+      setTimer(expiry);
+      upd("otp", "");
+      setStep("otp");
+    } catch (err: any) {
+      setApiError(err?.response?.data?.message ?? err?.message ?? "Failed to send OTP. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  // ── API CALL 2: POST /api/v1/auth/verify-otp ──────────────────────────────
+  // ── VERIFY OTP — stores tokens, dispatches setUser, redirects ─────────────
   const verifyOtp = async () => {
-    if (form.otp.length < 4) {
-      setErrors({ otp: "Enter the complete 4-digit OTP" });
+    if (form.otp.length < 6) {
+      setErrors({ otp: "Enter the complete 6-digit OTP" });
       return;
     }
-    setLoading(true);
-    setApiError("");
+    setLoading(true); setApiError("");
     try {
-      const res = await apiVerifyOtp({
-        phone: form.phone,
-        otp: form.otp,
-        intent: form.intent,
-        propertyType: form.propertyType,
-        city: form.city,
-        name: form.name,
-      });
-      if (res.success) {
-        if (res.token) localStorage.setItem("auth_token", res.token);
-        setStep("success");
-      } else {
-        setErrors({ otp: res.message ?? "Invalid OTP. Please try again." });
-      }
-    } catch (err: unknown) {
-      setErrors({ otp: err instanceof Error ? err.message : "Verification failed. Please try again." });
+      const { data } = await verifyOtpApi({ phone: form.phone, otp: form.otp });
+      const result   = data?.data ?? data;
+
+      // Persist tokens
+      if (result?.access_token)  localStorage.setItem("access_token",  result.access_token);
+      if (result?.refresh_token) localStorage.setItem("refresh_token", result.refresh_token);
+
+      // Hydrate Redux store
+      if (result?.user) dispatch(setUser(result.user));
+
+      setStep("success");
+    } catch (err: any) {
+      setErrors({ otp: err?.response?.data?.message ?? err?.message ?? "Invalid OTP. Please try again." });
     } finally {
       setLoading(false);
     }
@@ -350,18 +307,14 @@ export default function Think4BuySaleLanding() {
 
   // ── RESEND OTP ────────────────────────────────────────────────────────────
   const resend = async () => {
-    setApiError("");
+    setApiError(""); upd("otp", "");
     try {
-      const res = await apiSendOtp(form.phone);
-      if (res.success) {
-        const expiry = res.expiresIn ?? otpExpiry;
-        setTimer(expiry);
-        setForm((p) => ({ ...p, otp: "" }));
-      } else {
-        setApiError(res.message ?? "Could not resend OTP.");
-      }
-    } catch (err: unknown) {
-      setApiError(err instanceof Error ? err.message : "Network error.");
+      const { data } = await sendOtpApi({ phone: form.phone });
+      const expiry   = data?.expiresIn ?? data?.data?.expiresIn ?? otpExpiry;
+      setOtpExpiry(expiry);
+      setTimer(expiry);
+    } catch (err: any) {
+      setApiError(err?.response?.data?.message ?? "Could not resend OTP.");
     }
   };
 
@@ -475,15 +428,16 @@ export default function Think4BuySaleLanding() {
                   <div className="h-1.5 w-full" aria-hidden
                     style={{ background: "linear-gradient(90deg,#0B3C8C 0%,#1E40AF 35%,#2563EB 70%,#3B82F6 100%)" }} />
 
-                  {/* Step indicator */}
+                  {/* Step indicator — hidden on success */}
                   {step !== "success" && (
                     <div className="flex items-center gap-1 px-6 pt-5 mb-1" aria-label="Form progress" role="progressbar">
                       {["Your Details", "Verify OTP", "You're In!"].map((l, i) => {
-                        const cur = step === "form" ? 0 : step === "otp" ? 1 : 2;
-                        const done = i < cur, active = i === cur;
+                        const cur    = step === "form" ? 0 : step === "otp" ? 1 : 2;
+                        const done   = i < cur;
+                        const active = i === cur;
                         return (
                           <div key={l} className="flex items-center gap-1 flex-1 last:flex-none">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 text-[9px] font-black flex-shrink-0 transition-all duration-400
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 text-[9px] font-black flex-shrink-0 transition-all duration-300
                               ${done ? "bg-emerald-500 border-emerald-500" : active ? "bg-[#1E40AF] border-[#1E40AF]" : "bg-white border-slate-200"}`}>
                               {done ? <IC.Check s={10} c="white" /> : <span className={active ? "text-white" : "text-slate-400"}>{i + 1}</span>}
                             </div>
@@ -508,7 +462,9 @@ export default function Think4BuySaleLanding() {
                       </div>
                     )}
 
-                    {/* ── STEP 1: DETAILS ─────────────────────────────── */}
+                    {/* ══════════════════════════════════════════════════ */}
+                    {/* STEP 1: DETAILS                                   */}
+                    {/* ══════════════════════════════════════════════════ */}
                     {step === "form" && (
                       <div className="slide-in">
                         <h1 className="display text-[22px] font-bold text-[#0B3C8C] leading-tight mb-0.5">
@@ -584,7 +540,8 @@ export default function Think4BuySaleLanding() {
                           </label>
                           <input id="owner-name" type="text" autoComplete="name" value={form.name}
                             onChange={(e) => upd("name", e.target.value)} placeholder="e.g. Rajesh Kumar"
-                            aria-required="true" aria-invalid={!!errors.name} className={inpCls(errors.name)} style={{ fontSize: "16px" }} />
+                            aria-required="true" aria-invalid={!!errors.name}
+                            className={inpCls(errors.name)} style={{ fontSize: "16px" }} />
                           {errors.name && <p role="alert" className="text-rose-500 text-[11px] font-semibold mt-1.5">⚠ {errors.name}</p>}
                         </div>
 
@@ -627,7 +584,9 @@ export default function Think4BuySaleLanding() {
                       </div>
                     )}
 
-                    {/* ── STEP 2: OTP ─────────────────────────────────── */}
+                    {/* ══════════════════════════════════════════════════ */}
+                    {/* STEP 2: OTP VERIFICATION                          */}
+                    {/* ══════════════════════════════════════════════════ */}
                     {step === "otp" && (
                       <div className="slide-in">
                         <button onClick={() => { setStep("form"); setApiError(""); }}
@@ -635,17 +594,29 @@ export default function Think4BuySaleLanding() {
                           style={{ WebkitTapHighlightColor: "transparent" }} aria-label="Go back">
                           ← Back
                         </button>
+
                         <h2 className="display text-[22px] font-bold text-[#0B3C8C] mb-1">Verify Your Number</h2>
-                        <p className="text-slate-500 text-sm mb-1">
+                        <p className="text-slate-500 text-sm mb-0.5">
                           OTP sent to <strong className="text-[#1E40AF] font-black">+91 {form.phone}</strong>
                         </p>
                         <button onClick={() => { setStep("form"); setApiError(""); }}
-                          className="text-[11px] text-[#2563EB] font-black hover:underline border-none bg-transparent cursor-pointer font-[inherit] p-0 mb-1"
+                          className="text-[11px] text-[#2563EB] font-black hover:underline border-none bg-transparent cursor-pointer font-[inherit] p-0 mb-3"
                           style={{ WebkitTapHighlightColor: "transparent" }}>
                           Change number?
                         </button>
 
-                        <OtpInput value={form.otp} onChange={(v) => upd("otp", v)} />
+                        {/* Progress bar */}
+                        <div className="w-full h-1 bg-slate-100 rounded-full mb-1 overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-200"
+                            style={{
+                              width: `${(form.otp.length / 6) * 100}%`,
+                              background: "linear-gradient(90deg,#0B3C8C,#1E40AF,#2563EB)",
+                            }} />
+                        </div>
+
+                        {/* 6-box OTP */}
+                        <OtpInput value={form.otp} onChange={(v) => upd("otp", v)} disabled={loading} />
+
                         {errors.otp && (
                           <p role="alert" className="text-rose-500 text-[11px] font-semibold text-center -mt-2 mb-3 flex items-center justify-center gap-1">
                             ⚠ {errors.otp}
@@ -678,8 +649,8 @@ export default function Think4BuySaleLanding() {
                           <span className="text-[10px] text-slate-400 font-semibold">Valid for 10 min</span>
                         </div>
 
-                        <button onClick={verifyOtp} disabled={loading || form.otp.length < 4}
-                          aria-label="Verify OTP and post property"
+                        <button onClick={verifyOtp} disabled={loading || form.otp.length < 6}
+                          aria-label="Verify OTP and continue to dashboard"
                           className="w-full py-4 rounded-2xl text-[15px] font-black text-white border-none cursor-pointer disabled:opacity-50 transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] font-[inherit]"
                           style={{
                             background: "linear-gradient(135deg,#0B3C8C 0%,#1E40AF 50%,#2563EB 100%)",
@@ -688,13 +659,17 @@ export default function Think4BuySaleLanding() {
                           }}>
                           {loading
                             ? <span className="flex items-center justify-center gap-2"><IC.Spinner />Verifying…</span>
-                            : <span className="flex items-center justify-center gap-2">✓ Verify &amp; Post Property <IC.Arrow /></span>
+                            : form.otp.length === 6
+                              ? <span className="flex items-center justify-center gap-2">✓ Verify &amp; Go to Dashboard <IC.Arrow /></span>
+                              : <span>Enter OTP ({form.otp.length}/6)</span>
                           }
                         </button>
                       </div>
                     )}
 
-                    {/* ── STEP 3: SUCCESS ─────────────────────────────── */}
+                    {/* ══════════════════════════════════════════════════ */}
+                    {/* STEP 3: SUCCESS → router.push("/my-dashboard")    */}
+                    {/* ══════════════════════════════════════════════════ */}
                     {step === "success" && (
                       <div className="slide-in text-center py-3">
                         <div className="w-20 h-20 rounded-full mx-auto mb-5 flex items-center justify-center shadow-[0_8px_32px_rgba(16,185,129,0.45)]"
@@ -704,17 +679,20 @@ export default function Think4BuySaleLanding() {
                             <path d="M20 6L9 17l-5-5" />
                           </svg>
                         </div>
-                        <h2 className="display text-2xl font-bold text-[#0B3C8C] mb-2">You're Verified! 🎉</h2>
+
+                        <h2 className="display text-2xl font-bold text-[#0B3C8C] mb-2">You're In! 🎉</h2>
                         <p className="text-slate-500 text-sm leading-relaxed mb-5 max-w-xs mx-auto">
-                          Your details are saved. Complete your full listing to get{" "}
-                          <strong className="text-[#1E40AF]">5× more buyer enquiries.</strong>
+                          Account verified. Head to your dashboard to post your listing and{" "}
+                          <strong className="text-[#1E40AF]">start getting buyer enquiries.</strong>
                         </p>
+
+                        {/* What you can do */}
                         <div className="grid grid-cols-2 gap-2 mb-5 text-left">
                           {[
-                            { icon: "📋", l: "Add Full Details" },
-                            { icon: "📸", l: "Upload Photos" },
-                            { icon: "💰", l: "Set Your Price" },
-                            { icon: "📊", l: "Track Enquiries" },
+                            { icon: "📋", l: "Post Your Listing" },
+                            { icon: "📸", l: "Upload Photos"     },
+                            { icon: "💰", l: "Set Your Price"    },
+                            { icon: "📊", l: "Track Enquiries"   },
                           ].map(({ icon, l }) => (
                             <div key={l} className="flex items-center gap-2.5 bg-blue-50/60 border border-blue-100 rounded-2xl p-3">
                               <span className="text-xl flex-shrink-0">{icon}</span>
@@ -722,30 +700,35 @@ export default function Think4BuySaleLanding() {
                             </div>
                           ))}
                         </div>
-                        <button onClick={() => router.push("/post-property")}
+
+                        {/* Primary: Go to dashboard */}
+                        <button onClick={() => router.push("/my-dashboard")}
                           className="w-full py-4 rounded-2xl text-[15px] font-black text-white border-none cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:scale-[0.98] font-[inherit] mb-2.5"
                           style={{ background: "linear-gradient(135deg,#0B3C8C,#1E40AF,#2563EB)", boxShadow: "0 8px 28px rgba(11,60,140,0.4)", WebkitTapHighlightColor: "transparent" }}
-                          aria-label="Continue to complete your property listing">
-                          <span className="flex items-center justify-center gap-2">Complete Your Listing <IC.Arrow /></span>
+                          aria-label="Go to My Dashboard">
+                          <span className="flex items-center justify-center gap-2">Go to My Dashboard <IC.Arrow /></span>
                         </button>
-                        <button onClick={() => { setStep("form"); setForm((p) => ({ ...p, otp: "" })); }}
+
+                        {/* Secondary: post with another number */}
+                        <button onClick={() => { setStep("form"); setForm((p) => ({ ...p, otp: "", phone: "", name: "" })); }}
                           className="w-full py-3 rounded-2xl text-xs font-bold text-[#1D4ED8] border-2 border-blue-200 hover:border-[#2563EB] bg-white active:scale-[0.98] transition-all cursor-pointer font-[inherit]"
                           style={{ WebkitTapHighlightColor: "transparent" }}>
-                          Post Another Property
+                          Post with Another Number
                         </button>
                       </div>
                     )}
+
                   </div>
 
-                  {/* Trust strip */}
+                  {/* Trust strip — form step only */}
                   {step === "form" && (
                     <div className="px-6 pb-5 md:px-8">
                       <div className="border-t border-slate-100 pt-4 flex items-center justify-around">
                         {[
-                          { icon: <IC.Shield />, l: "100% Secure" },
-                          { icon: "✅", l: "RERA Verified" },
-                          { icon: "⚡", l: "Instant Live" },
-                          { icon: "🆓", l: "Always Free" },
+                          { icon: <IC.Shield />, l: "100% Secure"  },
+                          { icon: "✅",          l: "RERA Verified" },
+                          { icon: "⚡",          l: "Instant Live"  },
+                          { icon: "🆓",          l: "Always Free"   },
                         ].map(({ icon, l }) => (
                           <div key={l} className="text-center">
                             <div className="flex justify-center text-[#2563EB] mb-0.5">
@@ -782,17 +765,22 @@ export default function Think4BuySaleLanding() {
                 </p>
 
                 <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-8 list-none p-0 m-0" aria-label="Key features">
-                  {["Advertise for FREE — no credit card","Unlimited verified enquiries","Hide your number until ready",
-                    "Go live in under 2 minutes","RERA verified badge for trust","Real-time views & analytics"]
-                    .map((f) => (
-                      <li key={f} className="flex items-start gap-2.5">
-                        <div className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5"
-                          style={{ background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.3)" }}>
-                          <IC.Check s={9} c="#10b981" />
-                        </div>
-                        <span className="text-white/75 text-sm font-medium leading-snug">{f}</span>
-                      </li>
-                    ))}
+                  {[
+                    "Advertise for FREE — no credit card",
+                    "Unlimited verified enquiries",
+                    "Hide your number until ready",
+                    "Go live in under 2 minutes",
+                    "RERA verified badge for trust",
+                    "Real-time views & analytics",
+                  ].map((f) => (
+                    <li key={f} className="flex items-start gap-2.5">
+                      <div className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center mt-0.5"
+                        style={{ background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.3)" }}>
+                        <IC.Check s={9} c="#10b981" />
+                      </div>
+                      <span className="text-white/75 text-sm font-medium leading-snug">{f}</span>
+                    </li>
+                  ))}
                 </ul>
 
                 {/* Stats */}
@@ -875,9 +863,9 @@ export default function Think4BuySaleLanding() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[
-                { step: "01", icon: "📝", title: "Fill Quick Details", body: "Select property type, enter your city and contact number. Takes under 60 seconds." },
-                { step: "02", icon: "🔐", title: "Verify via OTP",     body: "Enter the 4-digit OTP sent to your mobile. Your number is instantly verified." },
-                { step: "03", icon: "🚀", title: "Go Live & Get Leads", body: "Complete your full listing with photos and price to start receiving genuine buyer enquiries." },
+                { step: "01", icon: "📝", title: "Fill Quick Details",  body: "Select property type, enter your city and contact number. Takes under 60 seconds."                    },
+                { step: "02", icon: "🔐", title: "Verify via OTP",      body: "Enter the 6-digit OTP sent to your mobile. Your number is instantly verified."                       },
+                { step: "03", icon: "🚀", title: "Go Live & Get Leads", body: "Complete your full listing with photos and price to start receiving genuine buyer enquiries."         },
               ].map((s) => (
                 <div key={s.step} className="glass rounded-3xl p-6 text-center hover:bg-white/6 transition-all group">
                   <div className="text-5xl mb-4 group-hover:scale-110 transition-transform duration-300">{s.icon}</div>
