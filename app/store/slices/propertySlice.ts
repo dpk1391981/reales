@@ -146,7 +146,7 @@ export const deleteProperty = createAsyncThunk(
  */
 export const fetchMyListings = createAsyncThunk(
   "property/myListings",
-  async (status: string | undefined, { rejectWithValue }) => {
+  async (status: any | undefined, { rejectWithValue }) => {
     try {
       const res = await getMyPropertiesApi(status);
       return res.data;
