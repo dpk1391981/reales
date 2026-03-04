@@ -1,358 +1,233 @@
 "use client";
 
-import { useState } from "react";
+import s from "../css_module/FeaturedProjects.module.css";
+import React, { useState, useEffect, useCallback } from "react";
+import { useSelector } from "react-redux";
+import { useRouter } from "next/navigation";
+import type { RootState } from "@/store";
+import { browsePropertiesApi, toggleSavePropertyApi, generateSlug, propertyUrl } from "@/services/propertyApi";
+import type { ApiPropertyRaw, BrowseFilters } from "@/services/propertyApi";
+import {
+  coverUrl,
+} from "@/utils/propertyDisplay";
 
-const projects = [
-  {
-    name: "Prestige Royal Heights",
-    location: "Whitefield, Bangalore",
-    price: "₹85L - ₹1.6Cr",
-    bhk: "2 & 3 BHK",
-    status: "Ready to Move",
-    tag: "Best Seller",
-    image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=1200",
-  },
-  {
-    name: "DLF Luxury Towers",
-    location: "Gurgaon, Delhi NCR",
-    price: "₹1.8Cr - ₹4.2Cr",
-    bhk: "3 & 4 BHK",
-    status: "Under Construction",
-    tag: "New Launch",
-    image: "https://images.unsplash.com/photo-1605276374104-dee2a0ed3cd6?q=80&w=1200",
-  },
-  {
-    name: "Lodha Waterfront",
-    location: "Worli, Mumbai",
-    price: "₹2.5Cr - ₹6Cr",
-    bhk: "3, 4 & 5 BHK",
-    status: "Ready to Move",
-    tag: "Premium",
-    image: "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?q=80&w=1200",
-  },
-  {
-    name: "Sobha City Vista",
-    location: "Sector 108, Noida",
-    price: "₹65L - ₹1.2Cr",
-    bhk: "2 & 3 BHK",
-    status: "Ready to Move",
-    tag: "Limited Units",
-    image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=1200",
-  },
-  {
-    name: "Godrej Horizon",
-    location: "Hinjewadi, Pune",
-    price: "₹72L - ₹1.4Cr",
-    bhk: "2 & 3 BHK",
-    status: "Under Construction",
-    tag: "Trending",
-    image: "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?q=80&w=1200",
-  },
-  {
-    name: "Brigade Orchards",
-    location: "Devanahalli, Bangalore",
-    price: "₹55L - ₹95L",
-    bhk: "1, 2 & 3 BHK",
-    status: "Ready to Move",
-    tag: "Affordable",
-    image: "https://images.unsplash.com/photo-1600566753151-384129cf4e3e?q=80&w=1200",
-  },
-];
+/* ── Helpers ──────────────────────────────────────────────── */
 
-const FILTERS = ["All", "Ready to Move", "Under Construction"];
+interface MCat {
+  id: number; name: string; slug: string;
+  subcategories: { id: number; name: string; slug: string; config_types: { id: number; name: string }[] }[];
+}
 
-// ── Icons ──────────────────────────────────────────────────────────────────────
+const resolve = (p: ApiPropertyRaw, cats: MCat[]) => {
+  let sub = "", cfg = "";
+  const c = cats.find(x => x.id === p.category_id);
+  if (c) { const sc = c.subcategories.find(x => x.id === p.subcategory_id); if (sc) { sub = sc.name; const cf = sc.config_types?.find(x => x.id === p.config_type_id); if (cf) cfg = cf.name; } }
+  return { sub, cfg };
+};
 
-const LocationIcon = () => (
-  <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
-    <circle cx="12" cy="9" r="2.5" />
-  </svg>
-);
+const fmtP = (v: string | number | null | undefined, lt?: string): string => {
+  if (!v) return "Price on Request";
+  const n = typeof v === "string" ? parseFloat(v) : v;
+  if (isNaN(n) || n <= 0) return "Price on Request";
+  const sf = lt === "rent" || lt === "pg" ? "/mo" : "";
+  if (n >= 1e7) return `₹${(n / 1e7).toFixed(2)} Cr${sf}`;
+  if (n >= 1e5) return `₹${(n / 1e5).toFixed(1)} L${sf}`;
+  if (n >= 1e3) return `₹${(n / 1e3).toFixed(0)}K${sf}`;
+  return `₹${n.toLocaleString("en-IN")}${sf}`;
+};
 
-const BedIcon = () => (
-  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path d="M2 9V19M22 9V19M2 14H22M2 9C2 9 5 7 12 7C19 7 22 9 22 9" />
-    <rect x="5" y="9" width="4" height="3" rx="1" />
-  </svg>
-);
+const fmtA = (v: string | number | null | undefined): string => {
+  if (!v) return ""; const n = typeof v === "string" ? parseFloat(v) : v;
+  return isNaN(n) || n <= 0 ? "" : `${n.toLocaleString("en-IN")} sq.ft`;
+};
 
-const ArrowRightIcon = () => (
-  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-    <path d="M5 12h14M12 5l7 7-7 7" />
-  </svg>
-);
+/* ── Icons ────────────────────────────────────────────────── */
+const Pin = () => <svg width="12" height="12" fill="none" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>;
+const Heart = ({ on }: { on: boolean }) => <svg width="16" height="16" viewBox="0 0 24 24" fill={on?"#ef4444":"none"} stroke={on?"#ef4444":"white"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>;
+const ArrR = () => <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>;
+const Tel = () => <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>;
+const Chev = () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>;
+const AreaIco = () => <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>;
 
-const HeartIcon = ({ filled }: { filled: boolean }) => (
-  <svg width="16" height="16" viewBox="0 0 24 24"
-    fill={filled ? "#ef4444" : "none"}
-    stroke={filled ? "#ef4444" : "currentColor"}
-    strokeWidth="2">
-    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-  </svg>
-);
+/* ── Filter tabs ──────────────────────────────────────────── */
+const FILTERS = ["All", "Ready to Move", "Under Construction", "New Launch"] as const;
+type Filter = (typeof FILTERS)[number];
 
-const ChevronRightIcon = () => (
-  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-    <path d="M9 18l6-6-6-6" />
-  </svg>
-);
+/* ── Card ─────────────────────────────────────────────────── */
 
-// ── Project Card ───────────────────────────────────────────────────────────────
+const Card = ({ p, cats, auth }: { p: ApiPropertyRaw; cats: MCat[]; auth: boolean }) => {
+  const router = useRouter();
+  const [saved, setSaved] = useState(p.isSaved ?? false);
+  const [busy, setBusy] = useState(false);
+  const { sub, cfg } = resolve(p, cats);
+  const title = p.title || `${cfg} ${sub}`.trim() || "Property";
+  const loc = p.locality || p.society || "";
+  const tags: string[] = [];
+  if (p.featured) tags.push("Featured");
+  if (p.urgent) tags.push("Urgent");
+  if (p.negotiable) tags.push("Negotiable");
 
-const ProjectCard = ({ project }: { project: typeof projects[0] }) => {
-  const [saved, setSaved] = useState(false);
-  const isReady = project.status === "Ready to Move";
+  const go = () => {
+    const sl = p.slug || generateSlug({ id: p.id, configLabel: cfg, typeLabel: sub, locality: p.locality || undefined });
+    router.push(propertyUrl(sl));
+  };
+  const onSave = async (e: React.MouseEvent) => {
+    e.stopPropagation(); if (!auth || busy) return; setBusy(true);
+    try { const r = await toggleSavePropertyApi(p.id); setSaved(r.data?.saved ?? !saved); } catch {} finally { setBusy(false); }
+  };
 
+  const cover    = coverUrl(p);
   return (
-    <div className="group bg-white rounded-3xl overflow-hidden
-      shadow-[0_2px_16px_rgba(15,35,66,0.08)]
-      hover:shadow-[0_12px_40px_rgba(15,35,66,0.16)]
-      active:scale-[0.99]
-      transition-all duration-300 border border-slate-100 cursor-pointer">
-
-      {/* ── Image ── */}
-      <div className="relative h-[200px] sm:h-[220px] overflow-hidden">
-        <img
-          src={project.image}
-          alt={project.name}
-          className="w-full h-full object-cover transition-transform duration-700
-            group-hover:scale-110"
-          loading="lazy"
-        />
-
-        {/* Dark gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-
-        {/* Top row badges */}
-        <div className="absolute top-3 left-3 right-3 flex items-start justify-between">
-          {/* Status badge */}
-          <span className={`text-[10px] font-bold px-3 py-1.5 rounded-full shadow-sm tracking-wide
-            ${isReady
-              ? "bg-emerald-500 text-white"
-              : "bg-amber-400 text-brand-900"
-            }`}>
-            {project.status}
+    <div className={s.card} onClick={go}>
+      <div className={s.cardImg}>
+        <img src={cover} alt={title} width={600} height={400} loading="lazy" />
+        <div className={s.cardOverlay} />
+        <div className={s.cardTopRow}>
+          <span className={`${s.cardBadge} ${p.listingType === "rent" || p.listingType === "pg" ? s.bRent : s.bSale}`}>
+            {p.listingType === "rent" ? "For Rent" : p.listingType === "pg" ? "PG" : "For Sale"}
           </span>
-
-          {/* Wishlist button */}
-          <button
-            onClick={(e) => { e.stopPropagation(); setSaved(!saved); }}
-            className={`w-8 h-8 rounded-full flex items-center justify-center
-              border transition-all active:scale-90
-              ${saved
-                ? "bg-white border-red-200 text-red-500"
-                : "bg-white/80 border-white/50 text-slate-600 backdrop-blur-sm"
-              }`}
-            style={{ WebkitTapHighlightColor: "transparent" }}
-          >
-            <HeartIcon filled={saved} />
-          </button>
+          <button onClick={onSave} className={`${s.heartBtn} ${saved ? s.heartSaved : ""}`}><Heart on={saved} /></button>
         </div>
-
-        {/* Tag pill at bottom */}
-        <div className="absolute bottom-3 left-3">
-          <span className="text-[9px] font-bold tracking-[0.12em] uppercase
-            bg-white/90 backdrop-blur-sm text-brand-900 px-2.5 py-1 rounded-full border border-white/50">
-            {project.tag}
-          </span>
-        </div>
+        {tags.length > 0 && <div className={s.cardTags}>{tags.map(t => <span key={t} className={s.cardTag}>{t}</span>)}</div>}
       </div>
-
-      {/* ── Content ── */}
-      <div className="p-4 md:p-5">
-
-        {/* Name */}
-        <h3 className="text-base md:text-lg font-bold text-brand-900 leading-snug mb-1.5
-          group-hover:text-amber-600 transition-colors">
-          {project.name}
-        </h3>
-
-        {/* Location */}
-        <p className="flex items-center gap-1 text-xs text-slate-500 mb-3">
-          <span className="text-amber-500"><LocationIcon /></span>
-          {project.location}
-        </p>
-
-        {/* Price + BHK row */}
-        <div className="flex items-center justify-between mb-3 py-3
-          border-y border-dashed border-slate-100">
-          <div>
-            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wide mb-0.5">Price</p>
-            <p className="text-base font-bold text-brand-900">{project.price}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wide mb-0.5">Config</p>
-            <p className="flex items-center gap-1 text-sm font-semibold text-slate-600">
-              <span className="text-amber-500"><BedIcon /></span>
-              {project.bhk}
-            </p>
-          </div>
+      <div className={s.cardBody}>
+        {(cfg || sub) && <p className={s.cardConfig}>{[cfg, sub].filter(Boolean).join(" · ")}</p>}
+        <h3 className={s.cardTitle}>{title}</h3>
+        {loc && <p className={s.cardLoc}><Pin /><span className={s.cardLocText}>{loc}</span></p>}
+        <div className={s.priceRow}>
+          <div><p className={s.priceLabel}>Price</p><p className={s.price}>{fmtP(p.price, p.listingType)}</p></div>
+          {fmtA(p.area) && <div style={{ textAlign: "right" }}><p className={s.priceLabel}>Area</p><p className={s.area}><span className={s.areaIco}><AreaIco /></span>{fmtA(p.area)}</p></div>}
         </div>
-
-        {/* CTA row */}
-        <div className="flex gap-2">
-          <button className="flex-1 bg-gradient-to-r btn-primary text-white
-            text-sm font-bold py-3 rounded-2xl transition-all
-            hover:shadow-[0_6px_20px_rgba(15,35,66,0.3)] hover:-translate-y-px
-            active:scale-[0.97] flex items-center justify-center gap-1.5">
-            View Details
-            <ArrowRightIcon />
-          </button>
-          <button className="px-4 py-3 rounded-2xl border-2 border-amber-400 text-amber-600
-            font-semibold text-sm transition-all hover:bg-amber-50 active:scale-[0.97]
-            whitespace-nowrap">
-            Call
-          </button>
+        <div className={s.actions}>
+          <button className={s.viewBtn} onClick={e => { e.stopPropagation(); go(); }}>View Details <ArrR /></button>
+          {!p.hideNumber && <button className={s.callBtn} onClick={e => e.stopPropagation()}><Tel /> Call</button>}
         </div>
       </div>
     </div>
   );
 };
 
-// ── Main Section ───────────────────────────────────────────────────────────────
+/* ── Skeleton ─────────────────────────────────────────────── */
 
-export default function FeaturedProjects() {
-  const [activeFilter, setActiveFilter] = useState("All");
+const Skel = () => (
+  <div className={s.skel}>
+    <div className={s.skelImg} />
+    <div className={s.skelBody}>
+      <div className={`${s.skelLine} ${s.sl1}`} />
+      <div className={`${s.skelLine} ${s.sl2}`} />
+      <div className={`${s.skelLine} ${s.sl3}`} />
+      <div className={s.skelPriceRow}><div className={s.skelPrice} /><div className={s.skelPrice} /></div>
+      <div className={s.skelActions}>
+        <div className={`${s.skelBtn} ${s.skelBtnMain}`} />
+        <div className={`${s.skelBtn} ${s.skelBtnCall}`} />
+      </div>
+    </div>
+  </div>
+);
 
-  const filtered = activeFilter === "All"
-    ? projects
-    : projects.filter((p) => p.status === activeFilter);
+/* ══════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+   ══════════════════════════════════════════════════════════════ */
+
+const FeaturedProjects: React.FC = () => {
+  const router = useRouter();
+  const cats = useSelector((r: RootState) => r.masters?.categories ?? []) as MCat[];
+  const auth = useSelector((r: RootState) => r.auth?.isAuthenticated ?? false);
+
+  const [filter, setFilter] = useState<Filter>("All");
+  const [props, setProps] = useState<ApiPropertyRaw[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const r = await browsePropertiesApi({ sort: "popular", limit: 9, page: 1 } as BrowseFilters);
+      const d = r.data?.data ?? r.data?.properties ?? r.data ?? [];
+      setProps(Array.isArray(d) ? d : []);
+    } catch { setError("Unable to load properties"); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = filter === "All" ? props : props.filter(p => {
+    if (filter === "Ready to Move") return p.age === "new" || p.age === "0-1 years";
+    if (filter === "Under Construction") return p.age === "1-5 years" || p.age === "5-10 years";
+    return !p.age || p.category_id === 5;
+  });
+
+  const goAll = () => router.push("/properties?sort=popular");
 
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600;700&display=swap');
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(16px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        .fade-up { animation: fadeUp 0.45s ease both; }
-      `}</style>
+    <section className={s.section} style={{ fontFamily: "var(--font-body, 'DM Sans', system-ui, sans-serif)" }}>
+      <div className={s.container}>
 
-      <section className="bg-[#f8fafc] py-10 md:py-20 px-4 md:px-6 font-[DM_Sans,sans-serif]">
-        <div className="max-w-[1280px] mx-auto">
-
-          {/* ── Section Header ── */}
-          <div className="fade-up mb-7 md:mb-12 flex flex-col sm:flex-row sm:items-end
-            sm:justify-between gap-4">
-            <div>
-              {/* Eyebrow */}
-              <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-amber-500 mb-2">
-                ✦ Handpicked for You
-              </p>
-              <h2 className="font-[Playfair_Display,serif] text-2xl md:text-4xl font-bold leading-tight">
-                <span className="bg-gradient-to-r from-brand-500 to-brand-600 bg-clip-text text-transparent">
-                  Featured
-                </span>{" "}
-                <span className="text-brand-900">Projects</span>
-              </h2>
-              <p className="text-slate-500 mt-2 text-sm leading-relaxed max-w-[420px]">
-                Premium residential projects across top Indian cities — verified & RERA approved.
-              </p>
-              {/* Underline */}
-              <div className="flex items-center gap-2 mt-3">
-                <div className="w-10 h-1 bg-amber-500 rounded-full" />
-                <div className="w-3 h-1 bg-amber-300 rounded-full" />
-                <div className="w-1.5 h-1 bg-amber-200 rounded-full" />
-              </div>
-            </div>
-
-            {/* View All — desktop */}
-            <a href="#"
-              className="hidden sm:flex items-center gap-2 text-sm font-semibold text-brand-900
-                border-2 border-slate-200 rounded-xl px-5 py-2.5 no-underline shrink-0
-                hover:border-[#0f2342] hover:bg-slate-50 transition-all">
-              View All Projects
-              <ChevronRightIcon />
-            </a>
+        {/* Header */}
+        <div className={`${s.header} ${s.fadeUp}`}>
+          <div>
+            <p className={s.eyebrow}><span className={s.eyebrowLine} />Handpicked for You</p>
+            <h2 className={s.title} style={{ fontFamily: "var(--font-display, 'Plus Jakarta Sans', sans-serif)" }}>
+              <span className={s.titleBlue}>Featured</span>{" "}<span className={s.titleDark}>Properties</span>
+            </h2>
+            <p className={s.subtitle}>Premium properties across top Indian cities — verified &amp; RERA approved.</p>
+            <div className={s.underline}><div className={s.uDot1} /><div className={s.uDot2} /><div className={s.uDot3} /></div>
           </div>
-
-          {/* ── Filter Tabs ── */}
-          <div className="fade-up flex gap-2 mb-6 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0"
-            style={{ animationDelay: "0.08s", scrollbarWidth: "none" }}>
-            {FILTERS.map((f) => (
-              <button
-                key={f}
-                onClick={() => setActiveFilter(f)}
-                className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold
-                  border transition-all cursor-pointer font-[inherit] active:scale-95
-                  ${activeFilter === f
-                    ? "bg-brand-900 text-white border-brand-900 shadow-[0_4px_12px_rgba(15,35,66,0.25)]"
-                    : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
-                  }`}
-                style={{ WebkitTapHighlightColor: "transparent" }}
-              >
-                {f}
-                {f !== "All" && (
-                  <span className={`ml-1.5 text-[9px] px-1.5 py-0.5 rounded-full
-                    ${activeFilter === f ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}>
-                    {projects.filter((p) => p.status === f).length}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* ── Projects Grid ── */}
-          {/* Mobile: horizontal scroll snap, Desktop: 3-col grid */}
-          <div
-            className="fade-up
-              flex gap-4 overflow-x-auto snap-x snap-mandatory pb-3 -mx-4 px-4
-              sm:mx-0 sm:px-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:snap-none
-              lg:grid-cols-3 sm:gap-6"
-            style={{ animationDelay: "0.14s", scrollbarWidth: "none" }}
-          >
-            {filtered.map((project) => (
-              <div key={project.name}
-                className="snap-start flex-shrink-0 w-[82vw] xs:w-[75vw] sm:w-auto">
-                <ProjectCard project={project} />
-              </div>
-            ))}
-          </div>
-
-          {/* ── Mobile scroll hint ── */}
-          <div className="sm:hidden flex items-center justify-center gap-1.5 mt-4">
-            {filtered.map((_, i) => (
-              <div key={i} className={`rounded-full transition-all ${i === 0 ? "w-5 h-1.5 bg-brand-900" : "w-1.5 h-1.5 bg-slate-300"}`} />
-            ))}
-          </div>
-
-          {/* ── View All — mobile ── */}
-          <div className="sm:hidden mt-6">
-            <a href="#"
-              className="btn-primaryflex items-center justify-center gap-2 w-full py-3.5 text-sm font-bold
-                text-brand-900 border-2 border-slate-200 rounded-2xl no-underline
-                active:bg-slate-50 transition-all">
-              View All Projects
-              <ChevronRightIcon />
-            </a>
-          </div>
-
-          {/* ── Stats row ── */}
-          <div
-            className="fade-up mt-10 md:mt-14 grid grid-cols-3 gap-3 md:gap-6
-              bg-gradient-to-r btn-primary rounded-3xl p-5 md:p-8"
-            style={{ animationDelay: "0.2s" }}
-          >
-            {[
-              { value: "1,200+", label: "Projects Listed" },
-              { value: "RERA", label: "Verified Only" },
-              { value: "48hr", label: "Response Time" },
-            ].map((stat) => (
-              <div key={stat.label} className="text-center">
-                <p className="text-xl md:text-3xl font-bold text-amber-400 font-[Playfair_Display,serif]">
-                  {stat.value}
-                </p>
-                <p className="text-[11px] md:text-sm text-white/60 font-medium mt-0.5">
-                  {stat.label}
-                </p>
-              </div>
-            ))}
-          </div>
-
+          <button className={`${s.viewAllBtn} ${s.showSm}`} style={{ display: "none" }} onClick={goAll}>View All Properties <Chev /></button>
         </div>
-      </section>
-    </>
+
+        {/* Filters */}
+        <div className={`${s.filterRow} ${s.fadeUp} ${s.d1}`}>
+          {FILTERS.map(f => (
+            <button key={f} onClick={() => setFilter(f)} className={`${s.filterBtn} ${filter === f ? s.filterBtnActive : ""}`}>
+              {f}
+              {f !== "All" && (
+                <span className={`${s.filterCount} ${filter === f ? s.fcActive : s.fcInactive}`}>
+                  {f === "Ready to Move" ? props.filter(p => p.age === "new" || p.age === "0-1 years").length
+                    : f === "Under Construction" ? props.filter(p => p.age === "1-5 years" || p.age === "5-10 years").length
+                    : props.filter(p => !p.age || p.category_id === 5).length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Grid */}
+        {loading ? (
+          <div className={s.grid}>{Array.from({ length: 6 }).map((_, i) => <div key={i} className={s.gridItem}><Skel /></div>)}</div>
+        ) : error ? (
+          <div className={s.empty}><p className={s.emptyTxt}>{error}</p><button className={s.retryBtn} onClick={load}>Try again</button></div>
+        ) : filtered.length === 0 ? (
+          <div className={s.empty}><p className={s.emptyTxt}>No properties found for this filter.</p></div>
+        ) : (
+          <>
+            <div className={`${s.grid} ${s.fadeUp} ${s.d2}`}>
+              {filtered.slice(0, 9).map(p => <div key={p.id} className={s.gridItem}><Card p={p} cats={cats} auth={auth} /></div>)}
+            </div>
+            {/* Scroll dots — mobile only */}
+            <div className={`${s.dots} ${s.hideSm}`}>
+              {filtered.slice(0, 9).map((_, i) => <div key={i} className={`${s.dot} ${i === 0 ? s.dotActive : s.dotOther}`} />)}
+            </div>
+          </>
+        )}
+
+        {/* Mobile view all */}
+        <div className={`${s.mViewAll} ${s.hideSm}`}>
+          <button className={s.mViewAllBtn} onClick={goAll}>View All Properties <Chev /></button>
+        </div>
+
+        {/* Stats */}
+        <div className={`${s.statsBar} ${s.fadeUp} ${s.d3}`}>
+          {[{ v: "1,200+", l: "Projects Listed" }, { v: "RERA", l: "Verified Only" }, { v: "< 48hr", l: "Response Time" }].map(x => (
+            <div key={x.l} className={s.statItem}>
+              <p className={s.statVal} style={{ fontFamily: "var(--font-display, 'Plus Jakarta Sans', sans-serif)" }}>{x.v}</p>
+              <p className={s.statLbl}>{x.l}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
-}
+};
+
+export default FeaturedProjects;

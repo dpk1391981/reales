@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "./responsive.css";
 import TopHeader from "./component/TopHeader";
 import Providers from "./Providers";
 import { Suspense } from "react";

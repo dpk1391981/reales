@@ -36,7 +36,7 @@ const cities = [
     properties: "18,000+",
     label: "Properties",
     tagline: "Gateway to South India",
-    image: "https://images.unsplash.com/photo-1587125935554-5b57c76c2f6b?q=80&w=1200",
+    image: "https://images.unsplash.com/photo-1582510003544-4d00b7f74220?q=80&w=1200",
   },
   {
     name: "Pune",
@@ -170,7 +170,7 @@ export default function TopCities() {
         .fade-up { animation: fadeUp 0.45s ease both; }
       `}</style>
 
-      <section className="bg-white py-10 md:py-20 overflow-hidden font-[DM_Sans,sans-serif]">
+      <section className="bg-white py-6 md:py-6 overflow-hidden font-[DM_Sans,sans-serif]">
         <div className="max-w-[1280px] mx-auto">
 
           {/* ── Section Header ── */}

@@ -139,7 +139,7 @@ export default function TopServices() {
         .fade-up { animation: fadeUp 0.45s ease both; }
       `}</style>
 
-      <section className="bg-[#f8fafc] py-10 md:py-20 px-4 md:px-6 font-[DM_Sans,sans-serif]">
+      <section className="bg-[#f8fafc] py-6 md:py-6 px-4 md:px-6 font-[DM_Sans,sans-serif]">
         <div className="max-w-[1280px] mx-auto">
 
           {/* ── Section Header ── */}

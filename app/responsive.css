@@ -1,0 +1,33 @@
+/* ──────────────────────────────────────────────────────────────
+   responsive.css
+   Import once globally in layout.tsx or globals.css:
+     @import './responsive.css';
+
+   Uses data-attributes for responsive show/hide:
+     data-sm="block"    → display: block at ≥640px
+     data-sm="flex"     → display: flex  at ≥640px
+     data-md="flex"     → display: flex  at ≥768px
+     data-hide-sm       → hidden at ≥640px
+   ────────────────────────────────────────────────────────────── */
+
+/* Show at sm (640px+) */
+[data-sm] { display: none !important; }
+@media (min-width: 640px) {
+  [data-sm="block"] { display: block !important; }
+  [data-sm="flex"]  { display: flex !important; }
+  [data-sm="grid"]  { display: grid !important; }
+  [data-sm="inline-flex"] { display: inline-flex !important; }
+}
+
+/* Show at md (768px+) */
+[data-md] { display: none !important; }
+@media (min-width: 768px) {
+  [data-md="block"] { display: block !important; }
+  [data-md="flex"]  { display: flex !important; }
+  [data-md="grid"]  { display: grid !important; }
+}
+
+/* Hide at sm (640px+) */
+@media (min-width: 640px) {
+  [data-hide-sm] { display: none !important; }
+}

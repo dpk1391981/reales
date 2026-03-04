@@ -1,0 +1,747 @@
+/**
+ * PropertiesPage.module.css
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ * CONFLICT AUDIT vs RealEstateHeader:
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ * HEADER GLOBALS THAT WOULD BREAK THIS PAGE (all now neutralised):
+ *
+ *  1.  *{box-sizing:border-box;}
+ *      → Header sets this globally. Fine for us too BUT we must NOT
+ *        re-declare it at * level ourselves (double reset = ok, but
+ *        adding margin:0 / padding:0 at * level would nuke header spacing).
+ *        Fix: scope as  .lp-root *, .lp-root *::before, .lp-root *::after
+ *
+ *  2.  body{font-family:'DM Sans',sans-serif; margin:0;}
+ *      → Header sets DM Sans on body. Our component uses Plus Jakarta Sans.
+ *        Fix: set font-family on .lp-root itself (inherits down) rather than
+ *        re-declaring on body. Elements inside use font-family:inherit so
+ *        they pick up Plus Jakarta Sans from .lp-root instead of DM Sans
+ *        from body.
+ *
+ *  3.  button,a{-webkit-tap-highlight-color:transparent;}
+ *      → Header declares this globally. We don't need to re-declare it;
+ *        if we do, must be scoped: .lp-root button, .lp-root a {...}
+ *        Fix: removed from module, handled per-element via inline style where
+ *        needed or via .lp-root button / .lp-root a selectors below.
+ *
+ *  4.  @keyframes ddFadeIn / slideDown / sheetUp / slideIn / popBounce
+ *      → Header defines all five. We MUST NOT reuse these names.
+ *        Fix: all listing animations are prefixed lp-:
+ *          lp-spin, lp-fadeup, lp-shimmer  (never clash with header names)
+ *
+ *  5.  a{text-decoration:none; color:inherit;}  (was in our old inline style)
+ *      → This was a GLOBAL bare-a rule — would override header nav link
+ *        colours and underlines on the entire page.
+ *        Fix: removed from module. Links inside listing use explicit color
+ *        via inline style or .lp-root a selector below.
+ *
+ *  6.  select, input, textarea, button { font-family:inherit; } (was global)
+ *      → Would override DM Sans on header's city-picker, search bar, etc.
+ *        Fix: scoped to .lp-root select, .lp-root input … below.
+ *
+ *  7.  .lp-topbar { position:sticky; top:0; z-index:20; }
+ *      → Header is z-index:100 (sticky top:0). Listing topbar at z:20 won't
+ *        fight it, but if the header's sticky height changes the listing
+ *        topbar needs `top` to match. Currently set to top:0 since the
+ *        listing page wraps below the header in normal document flow.
+ *        Fix: kept z-index at 20 (well below header's 100).
+ *
+ *  8.  Modal z-index collisions
+ *      → Header modals (LoginModal, RegisterModal) are z-index ~990.
+ *        Listing modals (enquiry, filter drawer) at z:90-100 are fine —
+ *        but header PostFreeSheet uses z:990.
+ *        Fix: lp-modal-bg z:200, lp-drawer-panel z:191 — well below 990.
+ *        Listing modals appear above the listing but below auth modals.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Google Font @import MUST stay at the very top of the file.
+ * Next.js CSS Modules process @import before anything else.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   KEYFRAMES  — all prefixed lp- to avoid clashing with:
+   ddFadeIn | slideDown | sheetUp | slideIn | popBounce  (header)
+   animate-spin (Tailwind/header buttons)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes lp-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes lp-fadeup {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0);   }
+}
+
+@keyframes lp-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ROOT WRAPPER
+   font-family set here so all children inherit Plus Jakarta Sans instead of
+   the body's DM Sans (set by RealEstateHeader).
+   Background + color scoped — won't touch anything outside .lp-root.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-root {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background: #F8FAFF;
+  min-height: 100vh;
+  color: #0f172a;
+  /* Isolate stacking context so internal z-indices don't fight header */
+  isolation: isolate;
+}
+
+/* box-sizing scoped to listing only — does NOT touch header elements */
+.lp-root *,
+.lp-root *::before,
+.lp-root *::after {
+  box-sizing: border-box;
+}
+
+/* Links inside listing — scoped, won't override header nav colours */
+.lp-root a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* Form elements inside listing use Plus Jakarta Sans NOT DM Sans */
+.lp-root select,
+.lp-root input,
+.lp-root textarea,
+.lp-root button {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+/* tap highlight scoped — header already handles its own elements */
+.lp-root button,
+.lp-root a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SKELETON LOADER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-sk {
+  background: linear-gradient(
+    90deg,
+    #eef2f9 25%,
+    #f4f6fb 50%,
+    #eef2f9 75%
+  );
+  background-size: 200% 100%;
+  animation: lp-shimmer 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LAYOUT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-wrap {
+  max-width: 1360px;
+  margin: 0 auto;
+}
+
+.lp-layout {
+  display: grid;
+  grid-template-columns: 268px 1fr;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SIDEBAR
+   top:0 is fine — the sidebar lives inside normal document flow below the
+   sticky header. If your header height is e.g. 68px, set top:68px here.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  background: #ffffff;
+  border-right: 1px solid #e8eef8;
+}
+
+.lp-sidebar::-webkit-scrollbar       { width: 3px; }
+.lp-sidebar::-webkit-scrollbar-track  { background: transparent; }
+.lp-sidebar::-webkit-scrollbar-thumb  { background: #e2e8f0; border-radius: 4px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FILTER INPUTS
+   Explicit font-family + font-size here prevents iOS auto-zoom (needs 16px)
+   and overrides the body's DM Sans.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-inp {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 13px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  color: #0f172a;
+  background: #ffffff;
+  outline: none;
+  transition: border-color 0.15s;
+  margin: 0;           /* neutralise any browser/global margin on input */
+  appearance: none;    /* neutralise browser styling */
+}
+
+.lp-inp::placeholder { color: #c8d3e0; }
+
+.lp-inp:focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FILTER SELECT
+   -webkit-appearance:none prevents the OS native chrome (Safari / iOS).
+   The header has its own selects — scoping ensures no bleed.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-sel {
+  width: 100%;
+  padding: 9px 32px 9px 12px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 13px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  color: #0f172a;
+  background: #ffffff;
+  outline: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: border-color 0.15s;
+  margin: 0;
+}
+
+.lp-sel:focus { border-color: #2563EB; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROPERTY CARD
+   animation uses lp-fadeup (not slideIn — that name belongs to header)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-card {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  background: #ffffff;
+  border-bottom: 1px solid #eef2f9;
+  transition: background 0.14s;
+  animation: lp-fadeup 0.3s ease both;
+}
+
+.lp-card:hover { background: #fafbff; }
+
+/* ── Card image ── */
+.lp-cimg {
+  position: relative;
+  width: 240px;
+  height: 182px;
+  background: linear-gradient(135deg, #0B3C8C, #2563EB);
+  flex-shrink: 0;
+  overflow: hidden;
+  display: block;       /* as <a> — prevent inline gap */
+}
+
+.lp-cimg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border: none;         /* reset any global img border */
+  transition: transform 0.32s ease;
+}
+
+.lp-card:hover .lp-cimg img { transform: scale(1.04); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BUTTONS
+   Must explicitly set border, margin, background etc. because the header's
+   global button reset (font-family, box-sizing) and Tailwind's preflight
+   may still affect bare <button> elements. These classes fully own their
+   own box model.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Outline button — Contact */
+.lp-btn-o {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  white-space: nowrap;
+  border: 1.5px solid #2563EB;
+  color: #2563EB;
+  background: #ffffff;
+  cursor: pointer;
+  transition: background 0.14s;
+  text-decoration: none;
+  line-height: 1;
+  margin: 0;
+  box-shadow: none;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.lp-btn-o:hover { background: #EFF6FF; color: #2563EB; }
+
+/* Primary button — View Details, submit */
+.lp-btn-p {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  white-space: nowrap;
+  background: linear-gradient(135deg, #1E40AF, #2563EB);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  transition: filter 0.14s;
+  text-decoration: none;
+  line-height: 1;
+  margin: 0;
+  box-shadow: none;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.lp-btn-p:hover  { filter: brightness(1.08); color: #ffffff; }
+.lp-btn-p:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PAGINATION BUTTONS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-pg-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.13s;
+  -webkit-tap-highlight-color: transparent;
+  padding: 0;
+  margin: 0;
+  line-height: 1;
+  box-shadow: none;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.lp-pg-btn:hover:not(:disabled) {
+  border-color: #2563EB;
+  color: #2563EB;
+  background: #EFF6FF;
+}
+
+.lp-pg-btn.on {
+  background: #1E40AF;
+  border-color: #1E40AF;
+  color: #ffffff;
+}
+
+.lp-pg-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ENQUIRY MODAL
+   z-index 200 — above listing content but below header (100) + auth modals
+   (LoginModal/RegisterModal/PostFreeSheet ~990).
+   IMPORTANT: header is z-index:100 (sticky). Modal at 200 WILL appear above
+   the sticky header — that is correct (modals always overlay everything).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-modal-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(7, 27, 65, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-end;
+}
+
+.lp-modal {
+  background: #ffffff;
+  width: 100%;
+  max-width: 460px;
+  margin: 0 auto;
+  border-radius: 20px 20px 0 0;
+  padding: 24px 24px 36px;
+  animation: lp-fadeup 0.28s ease both;
+}
+
+@media (min-width: 600px) {
+  .lp-modal-bg { align-items: center; }
+  .lp-modal    { border-radius: 20px; }
+}
+
+.lp-modal-inp {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 11px;
+  font-size: 14px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  outline: none;
+  background: #ffffff;
+  transition: border-color 0.14s;
+  margin: 0;
+  color: #0f172a;
+  display: block;     /* textarea override */
+}
+
+.lp-modal-inp:focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.09);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FILTER DRAWER (mobile)
+   z-index: backdrop 190, panel 191
+   Below auth modals (990) and enquiry modal (200? no — drawer is behind).
+   Order: auth modals (990) > enquiry (200) > drawer (191) > header (100)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-drawer-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 190;
+  background: rgba(7, 27, 65, 0.5);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.lp-drawer-panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 191;
+  background: #ffffff;
+  border-radius: 20px 20px 0 0;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: lp-fadeup 0.26s ease both;
+}
+
+.lp-drawer-panel::-webkit-scrollbar       { width: 3px; }
+.lp-drawer-panel::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 4px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SPEC CHIPS  (bed/bath/area tags on card)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.lp-spec {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  background: #F1F5F9;
+  padding: 3px 9px;
+  border-radius: 50px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  white-space: nowrap;
+  text-decoration: none;
+  /* neutralise any anchor styles if spec is wrapped in <a> */
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESULTS TOPBAR
+   z-index: 20 — below header (100). Sticks below header when header sticks.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-topbar {
+  background: #ffffff;
+  border-bottom: 1px solid #e8eef8;
+  padding: 11px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  position: sticky;
+  top: 0;
+  z-index: 20;   /* well below header's z:100 */
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SAVE BUTTON  (heart on card image)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-save-btn {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.38);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s;
+  padding: 0;
+  margin: 0;
+  line-height: 1;
+  outline: none;
+  box-shadow: none;
+}
+
+.lp-save-btn:hover { background: rgba(0, 0, 0, 0.6); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE FAB  (Filters sticky bottom bar)
+   Shown only on mobile via media query below.
+   z-index: 30 — above listing content, below header (100) and modals.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-mobile-fab {
+  display: none;    /* revealed at ≤900px */
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 10px 16px 18px;
+  background: linear-gradient(to top, #ffffff, rgba(255, 255, 255, 0.95));
+  z-index: 30;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SPINNER  (used by Ic.Spin icon)
+   Inline style on the SVG uses  animation: lp-spin  (not animate-spin which
+   belongs to Tailwind / header code).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-spin {
+  animation: lp-spin 1s linear infinite;
+  display: inline-block;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FILTER SECTION WRAPPER  (label + content block in sidebar/drawer)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-fsec {
+  padding: 14px 18px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.lp-fsec-label {
+  font-size: 10px;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  display: block;
+  margin: 0 0 9px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FILTER CHIP  (BHK, Posted By toggles)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 11px;
+  border-radius: 50px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.13s;
+  line-height: 1;
+  margin: 0;
+  outline: none;
+  box-shadow: none;
+  text-decoration: none;
+}
+
+.lp-chip:hover            { border-color: #93c5fd; color: #1E40AF; }
+.lp-chip.lp-chip-on,
+.lp-chip-on               { background: #EFF6FF; border-color: #2563EB; color: #1E40AF; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ACTIVE FILTER TAG  (applied filter badge with × remove button)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-ftag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: #EFF6FF;
+  border: 1px solid #DBEAFE;
+  border-radius: 50px;
+  padding: 2px 8px 2px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1E40AF;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  line-height: 1.4;
+}
+
+.lp-ftag-rm {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #1E40AF;
+  padding: 0;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  outline: none;
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LISTING TYPE TABS  (Buy / Rent / PG — in sidebar header and topbar)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-type-tabs {
+  display: flex;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.lp-type-tab {
+  flex: 1;
+  padding: 13px 0;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  cursor: pointer;
+  color: #64748b;
+  transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  margin: 0;
+  line-height: 1;
+  outline: none;
+}
+
+.lp-type-tab:hover       { color: #1E40AF; }
+.lp-type-tab.lp-tab-on,
+.lp-tab-on               { color: #1E40AF; border-bottom-color: #1E40AF; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HIDE HELPER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-hide-sm { /* revealed/hidden via media query below */ }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BUDGET CHIPS  (heading row shortcut chips — desktop only)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-budget-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FILTER TRIGGER BUTTON  (mobile — in topbar, hidden on desktop)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.lp-filter-trigger {
+  display: none;   /* shown at ≤900px */
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  color: #334155;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+  margin: 0;
+  box-shadow: none;
+}
+
+.lp-filter-trigger:hover { border-color: #2563EB; color: #1E40AF; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE BREAKPOINTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Tablet / small desktop ≤ 900px ── */
+@media (max-width: 900px) {
+  .lp-layout            { grid-template-columns: 1fr; }
+  .lp-sidebar           { display: none; }
+
+  .lp-card              { grid-template-columns: 136px 1fr; }
+  .lp-cimg              { width: 136px; height: 136px; }
+
+  .lp-mobile-fab        { display: block; }
+  .lp-filter-trigger    { display: flex; }
+  .lp-budget-chips      { display: none; }
+}
+
+/* ── Mobile ≤ 560px ── */
+@media (max-width: 560px) {
+  .lp-card              { grid-template-columns: 110px 1fr; }
+  .lp-cimg              { width: 110px; height: 118px; }
+
+  /* lp-cbody padding override — also set as inline style, but CSS wins */
+  .lp-cbody             { padding: 10px 12px !important; }
+
+  .lp-hide-sm           { display: none !important; }
+
+  /* Skeleton override on mobile */
+  .lp-sk-card           { grid-template-columns: 110px 1fr; }
+  .lp-sk-card > .lp-sk  { height: 118px; }
+}

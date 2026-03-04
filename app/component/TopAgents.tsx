@@ -250,7 +250,7 @@ export default function TopAgencies() {
         .fade-up { animation: fadeUp 0.45s ease both; }
       `}</style>
 
-      <section className="bg-[#f8fafc] py-10 md:py-20 overflow-hidden font-[DM_Sans,sans-serif]">
+      <section className="bg-[#f8fafc] py-6 md:py-6 overflow-hidden font-[DM_Sans,sans-serif]">
         <div className="max-w-[1280px] mx-auto">
 
           {/* ── Section Header ── */}
